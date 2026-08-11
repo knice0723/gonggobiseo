@@ -1,7 +1,7 @@
-// OpenAI(GPT) API 프록시
-// 브라우저에 API 키를 노출하지 않기 위해 서버에서 대신 호출합니다.
+// OpenAI(GPT) API 프록시 — GPT-5.6 Terra 기본
 // Vercel 환경변수 OPENAI_API_KEY 필요
-// (선택) OPENAI_MODEL 환경변수로 모델 변경 가능. 기본값: gpt-4o-mini
+// (선택) OPENAI_MODEL 로 모델 변경 가능. 기본값: gpt-5.6-terra (지능·비용 균형)
+//   - 더 높은 품질: gpt-5.6-sol / 더 저렴: gpt-5.6-luna
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -20,58 +20,42 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: "bad_request" });
     }
 
-    // 프론트엔드는 Anthropic 형식으로 보내므로 OpenAI 형식으로 변환합니다.
-    // - 문자열 content → 그대로
-    // - PDF 문서 블록 → OpenAI의 file 콘텐츠 파트로 변환
+    // Anthropic 형식(프론트) → OpenAI 형식 변환 (텍스트/PDF/이미지)
     const oaMessages = messages.map((m) => {
-      if (typeof m.content === "string") {
-        return { role: m.role, content: m.content };
-      }
+      if (typeof m.content === "string") return { role: m.role, content: m.content };
       const parts = (m.content || []).map((b) => {
         if (b.type === "text") return { type: "text", text: b.text };
         if (b.type === "document" && b.source && b.source.type === "base64") {
-          return {
-            type: "file",
-            file: {
-              filename: "document.pdf",
-              file_data: "data:" + (b.source.media_type || "application/pdf") + ";base64," + b.source.data
-            }
-          };
+          return { type: "file", file: { filename: "document.pdf", file_data: "data:" + (b.source.media_type || "application/pdf") + ";base64," + b.source.data } };
         }
         if (b.type === "image" && b.source && b.source.type === "base64") {
-          return {
-            type: "image_url",
-            image_url: { url: "data:" + b.source.media_type + ";base64," + b.source.data }
-          };
+          return { type: "image_url", image_url: { url: "data:" + b.source.media_type + ";base64," + b.source.data } };
         }
         return null;
       }).filter(Boolean);
       return { role: m.role, content: parts };
     });
 
-    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+    const model = process.env.OPENAI_MODEL || "gpt-5.6-terra";
+    const body = {
+      model,
+      max_completion_tokens: Math.min(max_tokens, 4000),
+      messages: oaMessages
+    };
+    // GPT-5 계열은 추론 강도 조절 가능 — 속도·비용을 위해 low 로 설정
+    if (model.indexOf("gpt-5") === 0) body.reasoning_effort = "low";
 
     const r = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "authorization": "Bearer " + key
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: Math.min(max_tokens, 2000),
-        messages: oaMessages
-      })
+      headers: { "content-type": "application/json", "authorization": "Bearer " + key },
+      body: JSON.stringify(body)
     });
 
     const data = await r.json();
     if (!r.ok) return res.status(r.status).json(data);
 
-    const text =
-      data.choices && data.choices[0] && data.choices[0].message
-        ? String(data.choices[0].message.content || "")
-        : "";
-
+    const text = data.choices && data.choices[0] && data.choices[0].message
+      ? String(data.choices[0].message.content || "") : "";
     return res.status(200).json({ text });
   } catch (e) {
     return res.status(500).json({ error: "server_error", message: String(e && e.message ? e.message : e) });
