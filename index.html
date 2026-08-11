@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>공고비서 — 정부지원사업 AI 매칭</title>
+<meta name="description" content="매일 아침, 내 사업에 맞는 정부지원사업만 골라서 보고드립니다.">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+  --paper:#FAFAF6; --card:#FFFFFF;
+  --ink:#1B2436; --ink-soft:#5C6577; --ink-faint:#8B93A3;
+  --line:#E4E3DA; --line-soft:#EFEEE6;
+  --seal:#C0392B; --seal-deep:#A63125; --seal-wash:#FBF0EE;
+  --navy:#2C4A73; --navy-wash:#EEF2F7;
+  --ok:#2E7D5B; --ok-wash:#EAF4EF;
+  --warn:#B7791F; --warn-wash:#FBF3E4;
+  --radius:10px;
+  --shadow:0 1px 2px rgba(27,36,54,.05), 0 8px 24px -12px rgba(27,36,54,.12);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{font-family:"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:15px;line-height:1.6;letter-spacing:-0.01em;}
+a{color:inherit;}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
+:focus-visible{outline:2px solid var(--navy);outline-offset:2px;border-radius:4px;}
+.hidden{display:none !important;}
+
+.btn{border-radius:7px;padding:8px 14px;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--ink);display:inline-flex;align-items:center;gap:6px;text-decoration:none;}
+.btn:hover{border-color:var(--ink-faint);}
+.btn-primary{background:var(--ink);border-color:var(--ink);color:#fff;}
+.btn-primary:hover{background:#2A3550;}
+.btn-seal{background:var(--seal);border-color:var(--seal);color:#fff;}
+.btn-seal:hover{background:var(--seal-deep);}
+.btn-lg{padding:12px 18px;font-size:14.5px;width:100%;justify-content:center;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;}
+.field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--card);}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--navy);outline:none;}
+.field .hint{font-size:11.5px;color:var(--ink-faint);margin-top:4px;}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;}
+.tag{font-size:11.5px;font-weight:600;color:var(--ink-soft);background:var(--paper);border:1px solid var(--line-soft);border-radius:5px;padding:2px 8px;}
+.badge-new{background:var(--ok-wash);color:var(--ok);font-size:11px;font-weight:700;padding:1px 8px;border-radius:99px;}
+.badge-status{font-size:11px;font-weight:700;padding:1px 9px;border-radius:99px;}
+.st-review{background:var(--navy-wash);color:var(--navy);}
+.st-writing{background:var(--warn-wash);color:var(--warn);}
+.st-done{background:var(--ok-wash);color:var(--ok);}
+.kw-chip{font-size:11.5px;background:var(--navy-wash);color:var(--navy);border-radius:99px;padding:2px 9px;font-weight:600;}
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:-3px;}
+.spinner.dark{border-color:var(--line);border-top-color:var(--ink);}
+@keyframes spin{to{transform:rotate(360deg);}}
+.err-box{background:var(--seal-wash);border:1px solid #F0D4D0;color:var(--seal-deep);border-radius:8px;padding:11px 13px;font-size:13px;margin-top:12px;line-height:1.6;}
+.demo-banner{background:var(--warn-wash);border-bottom:1px solid #EAD9B0;color:var(--warn);font-size:12.5px;font-weight:600;text-align:center;padding:7px 14px;}
+
+.stamp{width:72px;height:72px;border-radius:50%;border:2.5px solid var(--seal);box-shadow:inset 0 0 0 3px #fff, inset 0 0 0 4.5px var(--seal);color:var(--seal);display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(-8deg);font-family:"Noto Serif KR",serif;background:radial-gradient(circle at 35% 30%, rgba(192,57,43,.08), transparent 60%);flex-shrink:0;}
+.stamp .score{font-size:23px;font-weight:900;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;}
+.stamp .word{font-size:10.5px;font-weight:700;letter-spacing:.25em;margin-top:2px;margin-right:-.25em;}
+.stamp.mid{border-color:var(--navy);box-shadow:inset 0 0 0 3px #fff, inset 0 0 0 4.5px var(--navy);color:var(--navy);background:radial-gradient(circle at 35% 30%, rgba(44,74,115,.08), transparent 60%);}
+.stamp.low{border-color:var(--ink-faint);box-shadow:inset 0 0 0 3px #fff, inset 0 0 0 4.5px var(--ink-faint);color:var(--ink-faint);background:none;}
+.stamp.sm{width:52px;height:52px;}
+.stamp.sm .score{font-size:16px;}
+.stamp.sm .word{font-size:8px;}
+
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(rgba(250,250,246,.94),rgba(250,250,246,.94)),repeating-linear-gradient(0deg,transparent,transparent 34px,var(--line-soft) 35px);}
+.auth-card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-top:3px solid var(--ink);border-radius:var(--radius);box-shadow:var(--shadow);padding:34px 32px 28px;}
+.auth-logo{display:flex;align-items:center;gap:11px;margin-bottom:8px;}
+.logo-seal{width:38px;height:38px;border:2px solid var(--seal);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--seal);font-family:"Noto Serif KR",serif;font-weight:900;font-size:17px;transform:rotate(-6deg);flex-shrink:0;}
+.auth-logo b{font-family:"Noto Serif KR",serif;font-weight:900;font-size:23px;}
+.auth-sub{font-size:13.5px;color:var(--ink-soft);margin-bottom:22px;line-height:1.6;}
+.auth-alt{text-align:center;font-size:13px;color:var(--ink-soft);margin-top:16px;}
+.auth-alt button{background:none;border:none;color:var(--navy);font-weight:700;font-size:13px;text-decoration:underline;text-underline-offset:2px;}
+.auth-demo{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line);text-align:center;}
+.auth-msg{font-size:12.5px;border-radius:7px;padding:9px 12px;margin-bottom:12px;line-height:1.5;}
+.auth-msg.err{background:var(--seal-wash);color:var(--seal-deep);}
+.auth-msg.ok{background:var(--ok-wash);color:var(--ok);}
+
+.steps{display:flex;gap:6px;margin-bottom:22px;}
+.steps .s{flex:1;height:4px;border-radius:99px;background:var(--line-soft);}
+.steps .s.on{background:var(--seal);}
+.step-label{font-size:12px;font-weight:700;color:var(--seal);margin-bottom:4px;}
+.onb-title{font-family:"Noto Serif KR",serif;font-weight:900;font-size:20px;margin-bottom:4px;}
+.onb-sub{font-size:13px;color:var(--ink-soft);margin-bottom:20px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;}
+@media(max-width:480px){.grid2{grid-template-columns:1fr;}}
+
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh;}
+.main{padding:28px 36px 110px;max-width:1180px;width:100%;margin:0 auto;}
+.sidebar{border-right:1px solid var(--line);background:var(--card);padding:24px 16px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;overflow-y:auto;}
+.logo{display:flex;align-items:center;gap:10px;padding:4px 10px 20px;}
+.logo-name{font-family:"Noto Serif KR",serif;font-weight:900;font-size:19px;letter-spacing:-.02em;}
+.logo-name small{display:block;font-family:Pretendard,sans-serif;font-weight:500;font-size:11px;color:var(--ink-faint);letter-spacing:.02em;}
+.nav-label{font-size:11px;font-weight:600;color:var(--ink-faint);padding:14px 10px 6px;letter-spacing:.06em;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:none;background:none;font-size:14px;font-weight:500;color:var(--ink-soft);text-align:left;width:100%;}
+.nav-item:hover{background:var(--paper);color:var(--ink);}
+.nav-item.active{background:var(--navy-wash);color:var(--navy);font-weight:700;}
+.nav-item .cnt{margin-left:auto;font-size:11px;font-weight:700;background:var(--seal);color:#fff;border-radius:99px;padding:1px 7px;}
+.nav-item svg{width:17px;height:17px;flex-shrink:0;}
+.sidebar-foot{margin-top:auto;padding:12px 10px 0;font-size:12px;color:var(--ink-faint);border-top:1px solid var(--line-soft);}
+.sidebar-foot button{background:none;border:none;color:var(--ink-faint);font-size:12px;text-decoration:underline;padding:0;margin-top:4px;}
+
+.view{display:none;}
+.view.active{display:block;}
+.page-head{border-top:3px solid var(--ink);border-bottom:1px solid var(--line);padding:16px 0 18px;margin-bottom:22px;}
+.page-head h1{font-family:"Noto Serif KR",serif;font-weight:900;font-size:23px;letter-spacing:-.02em;}
+.page-head p{font-size:13.5px;color:var(--ink-soft);margin-top:4px;}
+.mobile-brand{display:none;align-items:center;gap:9px;margin-bottom:16px;}
+
+.doc-head{border-top:3px solid var(--ink);border-bottom:1px solid var(--line);padding:18px 0 20px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;}
+.doc-meta{display:flex;gap:18px;font-size:12.5px;color:var(--ink-soft);margin-bottom:10px;flex-wrap:wrap;}
+.doc-meta b{color:var(--ink);font-weight:600;margin-right:5px;}
+.doc-title{font-family:"Noto Serif KR",serif;font-weight:900;font-size:26px;letter-spacing:-.02em;line-height:1.35;}
+.doc-title .hl{color:var(--seal);}
+.doc-sub{font-size:13.5px;color:var(--ink-soft);margin-top:6px;}
+.head-stats{display:flex;gap:10px;}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px 16px;min-width:96px;}
+.stat .num{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;}
+.stat .lbl{font-size:11.5px;color:var(--ink-faint);}
+.stat.urgent .num{color:var(--seal);}
+.content-grid{display:grid;grid-template-columns:1fr 300px;gap:28px;align-items:start;}
+.tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+.tab{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:7px 15px;font-size:13px;font-weight:600;color:var(--ink-soft);}
+.tab.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.cards{display:flex;flex-direction:column;gap:14px;}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px 16px;display:grid;grid-template-columns:1fr auto;gap:6px 20px;transition:border-color .15s;}
+.card:hover{border-color:var(--ink-faint);}
+.card-eyebrow{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);margin-bottom:6px;flex-wrap:wrap;}
+.src{font-weight:600;color:var(--navy);}
+.dot{width:3px;height:3px;border-radius:50%;background:var(--line);display:inline-block;}
+.card-title{font-family:"Noto Serif KR",serif;font-weight:700;font-size:17px;line-height:1.45;margin-bottom:8px;}
+.card-title button{font:inherit;background:none;border:none;text-align:left;color:inherit;padding:0;}
+.card-title button:hover{text-decoration:underline;text-underline-offset:3px;}
+.card-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.card-summary{font-size:13.5px;color:var(--ink-soft);line-height:1.65;border-left:2px solid var(--line);padding-left:12px;margin-bottom:8px;}
+.card-summary b{color:var(--ink);font-weight:600;}
+.match-note{font-size:12.5px;color:var(--seal-deep);background:var(--seal-wash);border-radius:6px;padding:7px 11px;margin-bottom:4px;}
+.match-note::before{content:"✓ ";font-weight:800;}
+.stamp-col{display:flex;flex-direction:column;align-items:center;gap:10px;grid-row:1 / span 2;}
+.dday{font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink-soft);}
+.dday.urgent{color:var(--seal);}
+.card-foot{grid-column:1 / -1;display:flex;align-items:center;gap:8px;border-top:1px solid var(--line-soft);margin-top:10px;padding-top:12px;flex-wrap:wrap;}
+.btn-scrap{margin-left:auto;border:none;background:none;color:var(--ink-faint);font-size:13px;padding:6px 8px;}
+.btn-scrap.on{color:var(--seal);font-weight:700;}
+.deadline-info{font-size:12px;color:var(--ink-faint);font-variant-numeric:tabular-nums;}
+.side-panels .panel{margin-bottom:16px;}
+.panel h3{font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;}
+.panel h3 .edit{font-size:12px;font-weight:600;color:var(--navy);background:none;border:none;}
+.profile-rows{display:flex;flex-direction:column;gap:8px;font-size:13px;}
+.profile-rows .row{display:flex;justify-content:space-between;gap:10px;}
+.profile-rows .k{color:var(--ink-faint);flex-shrink:0;}
+.profile-rows .v{font-weight:600;text-align:right;}
+.kw{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--line-soft);}
+.mini-note{font-size:11.5px;color:var(--ink-faint);margin-top:10px;line-height:1.5;}
+.learn-cta{display:flex;align-items:center;gap:10px;background:var(--navy-wash);border:1px solid #DDE6F0;border-radius:8px;padding:11px 13px;font-size:12.5px;color:var(--navy);line-height:1.5;margin-top:12px;}
+.learn-cta b{display:block;}
+.learn-cta button{margin-left:auto;flex-shrink:0;}
+
+.search-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.search-bar input{flex:1;min-width:200px;border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:var(--card);}
+.search-bar select{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--card);}
+.ann-row{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 18px;display:flex;align-items:center;gap:16px;margin-bottom:10px;transition:border-color .15s;}
+.ann-row:hover{border-color:var(--ink-faint);}
+.ann-row .info{flex:1;min-width:0;}
+.ann-row .t{font-weight:700;font-size:14.5px;line-height:1.45;background:none;border:none;text-align:left;padding:0;color:inherit;}
+.ann-row .t:hover{text-decoration:underline;text-underline-offset:3px;}
+.ann-row .m{font-size:12px;color:var(--ink-soft);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.result-count{font-size:12.5px;color:var(--ink-faint);margin-bottom:12px;}
+.empty{border:1px dashed var(--line);border-radius:var(--radius);padding:36px 20px;text-align:center;color:var(--ink-faint);font-size:13.5px;line-height:1.7;}
+
+.detail-top{display:flex;gap:20px;align-items:flex-start;margin-bottom:20px;}
+.detail-title{font-family:"Noto Serif KR",serif;font-weight:900;font-size:22px;line-height:1.4;margin-bottom:6px;}
+.back-link{background:none;border:none;color:var(--ink-soft);font-size:13px;font-weight:600;padding:0;margin-bottom:14px;display:inline-flex;align-items:center;gap:5px;}
+.back-link:hover{color:var(--ink);}
+.detail-grid{display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start;}
+.meta-table{width:100%;border-collapse:collapse;font-size:13.5px;margin-bottom:18px;}
+.meta-table th{width:110px;text-align:left;color:var(--ink-faint);font-weight:600;padding:9px 0;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+.meta-table td{padding:9px 0;border-bottom:1px solid var(--line-soft);font-weight:500;}
+.sec-title{font-size:12px;font-weight:800;color:var(--seal);letter-spacing:.05em;margin:20px 0 10px;display:flex;align-items:center;gap:8px;}
+.sec-title::after{content:"";flex:1;height:1px;background:var(--line-soft);}
+.check-item{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:13.5px;align-items:flex-start;}
+.check-item:last-child{border-bottom:none;}
+.check-mark{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;margin-top:2px;}
+.ck-ok{background:var(--ok-wash);color:var(--ok);}
+.ck-warn{background:var(--warn-wash);color:var(--warn);}
+.check-item .why{display:block;font-size:12px;color:var(--ink-faint);}
+
+.scrap-row{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 18px;display:flex;align-items:center;gap:14px;margin-bottom:10px;flex-wrap:wrap;}
+.scrap-row .info{flex:1;min-width:220px;}
+.scrap-row select{border:1px solid var(--line);border-radius:7px;padding:6px 10px;background:var(--card);font-size:12.5px;font-weight:600;}
+
+.cal{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+.cal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line);}
+.cal-head b{font-family:"Noto Serif KR",serif;font-size:16px;}
+.cal-head .nav{display:flex;gap:6px;}
+.cal-head .nav button{border:1px solid var(--line);background:var(--card);border-radius:7px;padding:4px 10px;font-size:13px;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);}
+.cal-grid .wd{padding:8px 0;text-align:center;font-size:11.5px;font-weight:700;color:var(--ink-faint);border-bottom:1px solid var(--line-soft);}
+.cal-grid .wd:first-child{color:var(--seal);}
+.cal-cell{min-height:74px;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);padding:6px 7px;font-size:12px;font-variant-numeric:tabular-nums;}
+.cal-cell:nth-child(7n){border-right:none;}
+.cal-cell .d{color:var(--ink-faint);font-weight:600;}
+.cal-cell.today .d{background:var(--ink);color:#fff;border-radius:99px;padding:1px 6px;}
+.cal-ev{margin-top:4px;font-size:10.5px;font-weight:700;line-height:1.3;background:var(--seal-wash);color:var(--seal-deep);border-radius:4px;padding:2px 5px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;cursor:pointer;}
+.cal-ev.navy{background:var(--navy-wash);color:var(--navy);}
+.cal-legend{padding:10px 18px;font-size:12px;color:var(--ink-soft);display:flex;gap:16px;border-top:1px solid var(--line-soft);flex-wrap:wrap;}
+.leg-dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;}
+.dropzone{border:1.5px dashed var(--line);border-radius:var(--radius);padding:22px;text-align:center;color:var(--ink-soft);font-size:13px;background:var(--paper);cursor:pointer;transition:border-color .15s;}
+.dropzone:hover{border-color:var(--navy);}
+.dropzone b{display:block;color:var(--ink);margin-bottom:2px;}
+.dropzone .file-ok{color:var(--ok);font-weight:700;}
+.ai-result{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);padding:16px 18px;margin-top:14px;font-size:13.5px;}
+.ai-result h4{font-size:12px;font-weight:800;color:var(--navy);letter-spacing:.04em;margin:12px 0 6px;}
+.ai-result h4:first-of-type{margin-top:8px;}
+.ai-result ul{padding-left:18px;color:var(--ink-soft);display:flex;flex-direction:column;gap:3px;}
+.ai-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;color:var(--seal);letter-spacing:.04em;}
+.ai-badge::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--seal);}
+
+.alert-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;font-size:13.5px;border-bottom:1px solid var(--line-soft);gap:12px;}
+.alert-row:last-child{border-bottom:none;}
+.alert-row .desc{color:var(--ink-faint);font-size:12px;display:block;}
+.toggle{width:38px;height:22px;border-radius:99px;background:var(--line);border:none;position:relative;transition:background .15s;flex-shrink:0;}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 2px rgba(0,0,0,.2);}
+.toggle.on{background:var(--ok);}
+.toggle.on::after{transform:translateX(16px);}
+.kakao-preview{background:#B2C7DA;border-radius:12px;padding:16px;margin-top:8px;}
+.kakao-bubble{background:#FEE500;border-radius:4px 14px 14px 14px;padding:12px 14px;font-size:12.5px;line-height:1.6;max-width:290px;color:#1c1c1c;}
+.kakao-bubble b{display:block;margin-bottom:4px;}
+.kakao-time{font-size:10.5px;color:#5b6b7a;margin-top:5px;}
+
+.overlay{position:fixed;inset:0;background:rgba(27,36,54,.35);opacity:0;pointer-events:none;transition:opacity .2s;z-index:50;}
+.overlay.open{opacity:1;pointer-events:auto;}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(500px,100%);background:var(--card);z-index:60;box-shadow:-12px 0 40px rgba(27,36,54,.18);transform:translateX(100%);transition:transform .25s ease;display:flex;flex-direction:column;}
+.drawer.open{transform:translateX(0);}
+.drawer-head{padding:20px 24px 16px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:12px;}
+.drawer-head h2{font-family:"Noto Serif KR",serif;font-size:16.5px;font-weight:700;line-height:1.4;flex:1;}
+.drawer-head .close{border:none;background:none;font-size:20px;color:var(--ink-faint);padding:2px 6px;}
+.drawer-body{padding:20px 24px 32px;overflow-y:auto;font-size:13.5px;flex:1;}
+.guide-sec{margin-bottom:20px;}
+.guide-sec p{color:var(--ink-soft);line-height:1.7;margin-bottom:6px;}
+.guide-sec ol{padding-left:18px;color:var(--ink-soft);display:flex;flex-direction:column;gap:5px;}
+.guide-sec b{color:var(--ink);}
+.guide-tip{background:var(--paper);border:1px solid var(--line-soft);border-radius:8px;padding:11px 13px;color:var(--ink-soft);line-height:1.65;}
+.drawer-foot{padding:14px 24px;border-top:1px solid var(--line);display:flex;gap:8px;}
+.drawer-foot .btn{flex:1;justify-content:center;padding:10px;}
+.draft-out{white-space:pre-wrap;background:var(--paper);border:1px solid var(--line-soft);border-radius:8px;padding:14px;line-height:1.75;color:var(--ink-soft);font-size:13px;}
+.draft-out b{color:var(--ink);}
+
+.chat-body{display:flex;flex-direction:column;gap:12px;}
+.chat-msg{max-width:88%;padding:10px 13px;border-radius:12px;font-size:13.5px;line-height:1.65;white-space:pre-wrap;}
+.chat-msg.user{align-self:flex-end;background:var(--ink);color:#fff;border-bottom-right-radius:4px;}
+.chat-msg.ai{align-self:flex-start;background:var(--paper);border:1px solid var(--line-soft);border-bottom-left-radius:4px;color:var(--ink-soft);}
+.chat-msg.ai b{color:var(--ink);}
+.chat-input-row{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line);}
+.chat-input-row input{flex:1;border:1px solid var(--line);border-radius:99px;padding:10px 16px;}
+.chat-suggest{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 10px;}
+.chat-suggest button{font-size:11.5px;border:1px solid var(--line);background:var(--card);border-radius:99px;padding:4px 11px;color:var(--ink-soft);}
+
+.bottom-nav{display:none;}
+@media (max-width:1080px){
+  .content-grid,.detail-grid{grid-template-columns:1fr;}
+  .side-panels{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .side-panels .panel{margin-bottom:0;}
+  .two-col{grid-template-columns:1fr;}
+}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr;}
+  .sidebar{display:none;}
+  .main{padding:20px 18px 100px;}
+  .mobile-brand{display:flex;}
+  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:40;background:var(--card);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom));}
+  .bottom-nav button{flex:1;border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;font-weight:600;color:var(--ink-faint);padding:6px 0;}
+  .bottom-nav button.active{color:var(--seal);}
+  .bottom-nav svg{width:20px;height:20px;}
+}
+@media (max-width:640px){
+  .doc-title{font-size:21px;}
+  .head-stats{width:100%;}
+  .stat{flex:1;min-width:0;padding:9px 12px;}
+  .card{grid-template-columns:1fr;padding:16px 16px 12px;}
+  .stamp-col{grid-row:auto;flex-direction:row;order:-1;margin-bottom:10px;}
+  .stamp{width:56px;height:56px;}
+  .stamp .score{font-size:18px;}
+  .side-panels{grid-template-columns:1fr;}
+  .detail-top{flex-direction:column-reverse;}
+  .cal-cell{min-height:58px;padding:4px 4px;}
+  .cal-ev{font-size:9px;}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important;}}
+</style>
+</head>
+<body>
+
+<div id="demo-banner" class="demo-banner hidden">체험 모드로 실행 중입니다 — 회원가입·저장 기능은 Supabase 연결(설치가이드 2단계) 후 활성화됩니다.</div>
+
+<!-- ═══ 로그인 ═══ -->
+<div id="view-login" class="view active">
+  <div class="auth-wrap"><div class="auth-card">
+    <div class="auth-logo"><div class="logo-seal">告</div><b>공고비서</b></div>
+    <p class="auth-sub">매일 아침, 내 사업에 맞는 정부지원사업만<br>골라서 보고드립니다.</p>
+    <div id="login-msg"></div>
+    <div class="field"><label>이메일</label><input type="email" id="login-email" placeholder="you@company.com" autocomplete="email"></div>
+    <div class="field"><label>비밀번호</label><input type="password" id="login-pw" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn btn-primary btn-lg" id="login-btn" onclick="doLogin()">로그인</button>
+    <p class="auth-alt">아직 계정이 없으신가요? <button onclick="go('signup')">회원가입</button></p>
+    <div class="auth-demo"><button class="btn" onclick="enterDemo()">가입 없이 둘러보기 →</button></div>
+  </div></div>
+</div>
+
+<!-- ═══ 회원가입 ═══ -->
+<div id="view-signup" class="view">
+  <div class="auth-wrap"><div class="auth-card">
+    <div class="auth-logo"><div class="logo-seal">告</div><b>회원가입</b></div>
+    <p class="auth-sub">가입 후 사업 정보를 등록하면<br>맞춤 공고 매칭이 시작됩니다.</p>
+    <div id="signup-msg"></div>
+    <div class="field"><label>이메일</label><input type="email" id="su-email" placeholder="you@company.com" autocomplete="email"></div>
+    <div class="field"><label>비밀번호</label><input type="password" id="su-pw" placeholder="8자 이상" autocomplete="new-password"><div class="hint">8자 이상 입력하세요</div></div>
+    <button class="btn btn-seal btn-lg" id="su-btn" onclick="doSignup()">가입하고 사업 정보 등록하기</button>
+    <p class="auth-alt">이미 계정이 있으신가요? <button onclick="go('login')">로그인</button></p>
+  </div></div>
+</div>
+
+<!-- ═══ 온보딩 ═══ -->
+<div id="view-onboarding" class="view">
+  <div class="auth-wrap"><div class="auth-card" style="max-width:460px;">
+    <div class="steps"><div class="s on" id="st1"></div><div class="s" id="st2"></div><div class="s" id="st3"></div></div>
+    <div id="onb-1">
+      <div class="step-label">1단계 / 3단계</div>
+      <h2 class="onb-title">사업 기본 정보</h2>
+      <p class="onb-sub">공고의 신청 자격(업력·지역·규모)과 대조하는 데 사용됩니다.</p>
+      <div class="field"><label>회사명</label><input type="text" id="onb-company" placeholder="(주)회사명"></div>
+      <div class="grid2">
+        <div class="field"><label>업종</label><select id="onb-industry"><option>IT 서비스 (SaaS)</option><option>제조업</option><option>도소매·유통</option><option>콘텐츠·미디어</option><option>바이오·헬스케어</option><option>외식·프랜차이즈</option><option>기타</option></select></div>
+        <div class="field"><label>설립연도</label><input type="text" id="onb-founded" placeholder="2024"></div>
+        <div class="field"><label>소재지</label><select id="onb-region"><option>서울</option><option>경기</option><option>인천</option><option>부산</option><option>대구</option><option>광주</option><option>대전</option><option>울산</option><option>세종</option><option>강원</option><option>충북</option><option>충남</option><option>전북</option><option>전남</option><option>경북</option><option>경남</option><option>제주</option></select></div>
+        <div class="field"><label>직원 수</label><input type="text" id="onb-staff" placeholder="4명"></div>
+        <div class="field"><label>작년 매출</label><input type="text" id="onb-revenue" placeholder="1.2억 원"></div>
+      </div>
+      <button class="btn btn-primary btn-lg" onclick="onbStep(2)">다음</button>
+    </div>
+    <div id="onb-2" class="hidden">
+      <div class="step-label">2단계 / 3단계</div>
+      <h2 class="onb-title">무엇을 하는 사업인가요?</h2>
+      <p class="onb-sub">자유롭게 적을수록 매칭이 정확해집니다.</p>
+      <div class="field"><label>사업 소개</label><textarea id="onb-desc" rows="4" placeholder="예: 중소기업 대상 AI 기반 고객관리 구독 서비스를 운영합니다. 현재 유료 고객 23개사."></textarea></div>
+      <div class="field"><label>매칭 키워드 (쉼표로 구분)</label><input type="text" id="onb-kw" placeholder="AI, B2B, 마케팅, 수출"></div>
+      <button class="btn btn-primary btn-lg" onclick="onbStep(3)">다음</button>
+    </div>
+    <div id="onb-3" class="hidden">
+      <div class="step-label">3단계 / 3단계 · 선택</div>
+      <h2 class="onb-title">사업계획서로 학습시키기</h2>
+      <p class="onb-sub">사업계획서를 올리면 Claude가 읽고 매칭 기준을 더 정교하게 만듭니다. 나중에 프로필 메뉴에서도 할 수 있습니다.</p>
+      <button class="btn btn-seal btn-lg" id="onb-done" onclick="finishOnboarding()">완료 — 브리핑 시작하기</button>
+      <p class="auth-alt"><button onclick="finishOnboarding()">건너뛰기</button></p>
+    </div>
+  </div></div>
+</div>
+
+<!-- ═══ 앱 ═══ -->
+<div id="app" class="app hidden">
+  <aside class="sidebar">
+    <div class="logo"><div class="logo-seal">告</div><div class="logo-name">공고비서<small>정부지원사업 매칭</small></div></div>
+    <div class="nav-label">브리핑</div>
+    <button class="nav-item" data-nav="dashboard" onclick="go('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-8 9 8M5 10v10h14V10"/></svg>오늘의 맞춤 공고 <span class="cnt" id="nav-cnt">0</span></button>
+    <button class="nav-item" data-nav="search" onclick="go('search')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>전체 공고 검색</button>
+    <button class="nav-item" data-nav="calendar" onclick="go('calendar')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>마감 캘린더</button>
+    <button class="nav-item" data-nav="scrap" onclick="go('scrap')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4V3z"/></svg>스크랩 · 지원 현황</button>
+    <div class="nav-label">AI</div>
+    <button class="nav-item" data-nav="profile" onclick="go('profile')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5M5 3h9l5 5v13H5V3z"/></svg>사업 프로필 · 문서 학습</button>
+    <button class="nav-item" onclick="openChat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/></svg>AI에게 질문하기</button>
+    <div class="nav-label">설정</div>
+    <button class="nav-item" data-nav="alerts" onclick="go('alerts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a2 2 0 003.4 0"/></svg>알림 설정</button>
+    <div class="sidebar-foot"><span id="side-user">체험 모드</span><br><span id="side-src">공고 수집 대기 중</span><br><button onclick="doLogout()">로그아웃</button></div>
+  </aside>
+
+  <main class="main">
+    <div class="mobile-brand"><div class="logo-seal">告</div><div class="logo-name">공고비서</div></div>
+
+    <div id="view-dashboard" class="view">
+      <header class="doc-head">
+        <div>
+          <div class="doc-meta"><span><b>수신</b><span id="greet-name">대표님</span></span><span><b>발신</b>공고비서 데일리 브리핑</span><span><b>시행</b><span id="today-str"></span></span></div>
+          <h1 class="doc-title" id="brief-title">공고를 수집하고 있습니다…</h1>
+          <p class="doc-sub" id="brief-sub"></p>
+        </div>
+        <div class="head-stats">
+          <div class="stat"><div class="num" id="stat-match">0</div><div class="lbl">맞춤 공고</div></div>
+          <div class="stat urgent"><div class="num" id="stat-urgent">0</div><div class="lbl">마감 임박 (D-7)</div></div>
+          <div class="stat"><div class="num" id="stat-scrap">0</div><div class="lbl">스크랩</div></div>
+        </div>
+      </header>
+      <div class="content-grid">
+        <section>
+          <div class="tabs" id="dash-tabs">
+            <button class="tab active" data-f="all">전체</button>
+            <button class="tab" data-f="urgent">마감임박</button>
+            <button class="tab" data-f="new">오늘 신규</button>
+            <button class="tab" data-f="scrap">스크랩됨</button>
+          </div>
+          <div class="cards" id="dash-cards"></div>
+        </section>
+        <aside class="side-panels">
+          <div class="panel">
+            <h3>내 사업 프로필 <button class="edit" onclick="go('profile')">수정</button></h3>
+            <div class="profile-rows" id="mini-profile"></div>
+            <div class="kw" id="mini-kw"></div>
+            <div class="learn-cta"><div><b>사업계획서로 학습시키기</b>매칭 정확도가 올라갑니다.</div><button class="btn" onclick="go('profile')">학습</button></div>
+          </div>
+          <div class="panel">
+            <h3>알림 <button class="edit" onclick="go('alerts')">설정</button></h3>
+            <div class="alert-row"><div>매일 아침 브리핑 <span class="desc">이메일 · 준비 중</span></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
+            <div class="alert-row"><div>마감 임박 리마인더 <span class="desc">스크랩 공고 D-3</span></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <div id="view-search" class="view">
+      <div class="page-head"><h1>전체 공고 검색</h1><p id="search-desc">수집된 진행 중 공고를 검색합니다. 적합도는 내 프로필 기준으로 자동 계산됩니다.</p></div>
+      <div class="search-bar">
+        <input id="q" type="search" placeholder="공고명, 키워드 검색 (예: 마케팅, R&D, 수출)" oninput="renderSearch()">
+        <select id="f-cat" onchange="renderSearch()"><option value="">분야 전체</option></select>
+        <select id="f-sort" onchange="renderSearch()"><option value="score">적합도순</option><option value="dday">마감임박순</option><option value="new">최신등록순</option></select>
+      </div>
+      <p class="result-count" id="result-count"></p>
+      <div id="search-list"></div>
+    </div>
+
+    <div id="view-detail" class="view"></div>
+
+    <div id="view-calendar" class="view">
+      <div class="page-head"><h1>마감 캘린더</h1><p>맞춤 공고(남색)와 스크랩 공고(빨강)의 접수 마감일입니다.</p></div>
+      <div class="cal">
+        <div class="cal-head"><b id="cal-title"></b><div class="nav"><button onclick="calMove(-1)">◀</button><button onclick="calMove(1)">▶</button></div></div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <div class="cal-legend">
+          <span><span class="leg-dot" style="background:var(--seal-wash);border:1px solid var(--seal);"></span>스크랩 공고 마감</span>
+          <span><span class="leg-dot" style="background:var(--navy-wash);border:1px solid var(--navy);"></span>맞춤 공고 마감</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-scrap" class="view">
+      <div class="page-head"><h1>스크랩 · 지원 현황</h1><p>관심 공고를 모아두고 검토 → 작성 → 제출까지 진행 상태를 관리하세요.</p></div>
+      <div id="scrap-list"></div>
+    </div>
+
+    <div id="view-profile" class="view">
+      <div class="page-head"><h1>사업 프로필 · 문서 학습</h1><p>프로필과 학습된 문서를 바탕으로 공고를 매칭합니다.</p></div>
+      <div class="two-col">
+        <div class="panel">
+          <h3>기본 프로필</h3>
+          <div class="grid2">
+            <div class="field"><label>회사명</label><input type="text" id="p-company"></div>
+            <div class="field"><label>업종</label><input type="text" id="p-industry"></div>
+            <div class="field"><label>설립연도</label><input type="text" id="p-founded"></div>
+            <div class="field"><label>소재지</label><input type="text" id="p-region"></div>
+            <div class="field"><label>직원 수</label><input type="text" id="p-staff"></div>
+            <div class="field"><label>작년 매출</label><input type="text" id="p-revenue"></div>
+          </div>
+          <div class="field"><label>사업 소개</label><textarea id="p-desc" rows="4"></textarea></div>
+          <div class="field"><label>매칭 키워드 (쉼표로 구분해 수정 가능)</label><input type="text" id="p-kw"><div class="hint">문서를 학습시키면 키워드가 자동으로 추가됩니다.</div></div>
+          <button class="btn btn-primary" id="p-save" onclick="saveProfile(true)">프로필 저장</button>
+          <span id="p-save-msg" style="font-size:12.5px;color:var(--ok);margin-left:8px;"></span>
+        </div>
+        <div class="panel">
+          <h3><span>문서 학습 <span class="ai-badge" style="margin-left:6px;">Claude 연결</span></span></h3>
+          <p style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;line-height:1.65;">사업계획서·회사소개서·IR 자료를 올리면 Claude가 읽고 ① 사업 요약 ② 강점 ③ 매칭 키워드 ④ 추천 지원 분야를 추출해 프로필에 반영합니다.</p>
+          <input type="file" id="doc-file" accept=".pdf,.txt,.md" class="hidden" onchange="onFilePick(this)">
+          <div class="dropzone" onclick="document.getElementById('doc-file').click()" id="dropzone"><b>파일 올리기 (PDF, TXT)</b>클릭해서 사업계획서를 선택하세요</div>
+          <div class="field" style="margin-top:12px;"><label>또는 내용 붙여넣기</label><textarea id="doc-paste" rows="5" placeholder="사업계획서나 회사 소개 내용을 붙여넣어도 됩니다."></textarea></div>
+          <button class="btn btn-seal btn-lg" id="analyze-btn" onclick="analyzeDoc()">Claude로 분석해서 학습하기</button>
+          <div id="ai-out"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-alerts" class="view">
+      <div class="page-head"><h1>알림 설정</h1><p>새 공고와 마감 일정을 놓치지 않도록 설정하세요.</p></div>
+      <div class="two-col">
+        <div class="panel">
+          <h3>알림 채널</h3>
+          <div class="alert-row"><div>이메일 데일리 브리핑 <span class="desc" id="alert-email">-</span></div><button class="toggle" onclick="this.classList.toggle('on')"></button></div>
+          <div class="alert-row"><div>카카오 알림톡 <span class="desc">2단계 업데이트 예정</span></div><button class="toggle" disabled style="opacity:.4;"></button></div>
+          <h3 style="margin-top:22px;">알림 조건</h3>
+          <div class="alert-row"><div>적합도 기준 <span class="desc">이 점수 이상일 때 알림</span></div><select style="border:1px solid var(--line);border-radius:7px;padding:6px 10px;"><option>85점 이상</option><option selected>80점 이상</option><option>70점 이상</option></select></div>
+          <div class="alert-row"><div>마감 임박 리마인더 <span class="desc">스크랩 공고 대상</span></div><select style="border:1px solid var(--line);border-radius:7px;padding:6px 10px;"><option selected>D-3</option><option>D-5</option><option>D-7</option></select></div>
+          <p class="mini-note">이메일 자동 발송은 다음 업데이트에서 활성화됩니다. 지금은 접속 시 브리핑과 캘린더로 확인할 수 있습니다.</p>
+        </div>
+        <div class="panel">
+          <h3>알림톡 미리보기</h3>
+          <div class="kakao-preview"><div class="kakao-bubble"><b>[공고비서] 적합도 높은 신규 공고</b>내 사업과 맞는 공고가 등록되면<br>이런 형태로 알려드립니다.<br><br>▶ 요약과 작성 가이드 보기<div class="kakao-time">오전 8:00</div></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 드로어: 작성 가이드 -->
+<div class="overlay" id="overlay" onclick="closeDrawers()"></div>
+<aside class="drawer" id="guide-drawer">
+  <div class="drawer-head"><h2 id="guide-title"></h2><button class="close" onclick="closeDrawers()">✕</button></div>
+  <div class="drawer-body" id="guide-body"></div>
+  <div class="drawer-foot"><button class="btn btn-seal" id="draft-btn">AI 초안 생성</button><button class="btn" onclick="closeDrawers()">닫기</button></div>
+</aside>
+
+<!-- 드로어: AI 채팅 -->
+<aside class="drawer" id="chat-drawer">
+  <div class="drawer-head"><h2>공고비서 AI에게 질문 <span class="ai-badge" style="margin-left:4px;">Claude</span></h2><button class="close" onclick="closeDrawers()">✕</button></div>
+  <div class="drawer-body chat-body" id="chat-body">
+    <div class="chat-msg ai">안녕하세요. 지원사업이나 신청 요건에 대해 무엇이든 물어보세요. 등록된 사업 프로필을 바탕으로 답변드립니다.</div>
+  </div>
+  <div class="chat-suggest">
+    <button onclick="quickAsk('여러 지원사업을 동시에 신청해도 되나요?')">중복 신청 가능 여부</button>
+    <button onclick="quickAsk('우리 회사에 지금 우선순위가 높은 공고는 뭔가요?')">우선순위 추천</button>
+  </div>
+  <div class="chat-input-row"><input id="chat-input" type="text" placeholder="질문을 입력하세요" onkeydown="if(event.key==='Enter')sendChat()"><button class="btn btn-primary" onclick="sendChat()">전송</button></div>
+</aside>
+
+<nav class="bottom-nav" id="bottom-nav" style="display:none;">
+  <button data-nav="dashboard" onclick="go('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-8 9 8M5 10v10h14V10"/></svg>브리핑</button>
+  <button data-nav="search" onclick="go('search')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>검색</button>
+  <button data-nav="calendar" onclick="go('calendar')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>캘린더</button>
+  <button data-nav="scrap" onclick="go('scrap')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4V3z"/></svg>스크랩</button>
+  <button data-nav="profile" onclick="go('profile')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5M5 3h9l5 5v13H5V3z"/></svg>프로필</button>
+</nav>
+
+<script>
+/* ════════════════════════════════════════════
+   ① 설정 — 설치가이드 2단계에서 아래 두 값을 붙여넣으세요
+   (붙여넣기 전까지는 '체험 모드'로 동작합니다)
+════════════════════════════════════════════ */
+const CONFIG = {
+  SUPABASE_URL: "",        // 예: "https://xxxx.supabase.co"
+  SUPABASE_ANON_KEY: ""    // Supabase → Settings → API Keys 의 anon public 키
+};
+
+/* ══ 상태 ══ */
+const DEMO_AUTH = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
+const sb = DEMO_AUTH ? null : window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+let userId = null, userEmail = null;
+let ANNS = [];             // 정규화된 공고 목록
+let annSource = "loading"; // bizinfo | seed
+let scraps = {};           // ann_key -> status
+let currentView = "login";
+const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+const STATUS = ["검토 중","작성 중","제출 완료","보류"];
+const STCLASS = {"검토 중":"st-review","작성 중":"st-writing","제출 완료":"st-done","보류":""};
+
+let PROFILE = {
+  company:"", industry:"", founded:"", region:"", staff:"", revenue:"",
+  descr:"", keywords:[]
+};
+
+/* ══ 유틸 ══ */
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function mdLite(t){return esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/^#{2,3} (.+)$/gm,"<b>$1</b>");}
+function fmtDate(d){return d.getFullYear()+". "+String(d.getMonth()+1).padStart(2,"0")+". "+String(d.getDate()).padStart(2,"0")+".("+["일","월","화","수","목","금","토"][d.getDay()]+")";}
+function greet(){return userEmail ? userEmail.split("@")[0]+"님" : "대표님";}
+function msg(id, type, text){document.getElementById(id).innerHTML = text ? '<div class="auth-msg '+type+'">'+esc(text)+'</div>' : "";}
+
+/* ══ 마감일 파싱 & D-day ══ */
+function parseDeadline(period){
+  const s = String(period||"");
+  const re = /(\d{4})[.\-\/년\s]?(\d{1,2})[.\-\/월\s]?(\d{1,2})/g;
+  let m, last=null;
+  while((m=re.exec(s))!==null) last=m;
+  if(!last) return null;
+  const d = new Date(+last[1], +last[2]-1, +last[3]);
+  return isNaN(d) ? null : d;
+}
+function ddayOf(a){
+  if(!a.deadlineDate) return 999;
+  return Math.round((a.deadlineDate - TODAY)/86400000);
+}
+
+/* ══ 적합도 계산 (규칙 기반 1차 스코어링) ══ */
+function scoreAnn(a){
+  const text = (a.title+" "+(a.summary||"")+" "+(a.field||"")).toLowerCase();
+  let s = 48; const reasons=[];
+  const words = new Set();
+  (PROFILE.keywords||[]).forEach(k=>String(k).replace(/^#/,"").split(/[·,\s/]+/).forEach(w=>{if(w.length>=2)words.add(w.toLowerCase());}));
+  String(PROFILE.industry||"").split(/[()\s·,/]+/).forEach(w=>{if(w.length>=2)words.add(w.toLowerCase());});
+  String(PROFILE.descr||"").split(/[\s,.()·/]+/).forEach(w=>{if(w.length>=3)words.add(w.toLowerCase());});
+  const hits=[...words].filter(w=>text.includes(w));
+  s += Math.min(hits.length*7, 28);
+  if(hits.length) reasons.push("프로필 키워드 일치: "+hits.slice(0,3).join(", "));
+  const reg = String(PROFILE.region||"").slice(0,2);
+  const m = a.title.match(/^\[([^\]]+)\]/);
+  if(m){
+    if(reg && m[1].includes(reg)){ s+=12; reasons.push("소재지("+reg+") 요건 일치"); }
+    else if(!/전국/.test(m[1])){ s-=24; reasons.push(m[1]+" 지역 한정 공고"); }
+  } else { s+=3; }
+  const dd = ddayOf(a);
+  if(dd!==999 && dd<0) s = 10;
+  s = Math.max(10, Math.min(96, Math.round(s)));
+  let verdict = s>=80 ? "적합" : (s>=60 ? "검토" : "낮음");
+  let note = reasons.length ? reasons.join(" · ") : "프로필과의 접점이 뚜렷하지 않습니다. 원문에서 자격 요건을 확인하세요.";
+  return { score:s, verdict, note };
+}
+
+/* ══ 공고 데이터 로드 ══ */
+const SEED = [
+  {key:"seed-1", source:"K-Startup(예시)", field:"창업", title:"2026년 초기창업패키지 창업기업 추가모집 공고", agency:"중소벤처기업부 / 창업진흥원", period:"", summary:"사업화 자금 최대 1억 원과 창업교육·멘토링을 지원합니다. 업력 3년 이내 창업기업 대상, K-Startup 온라인 접수.", url:"https://www.k-startup.go.kr", offsetEnd:9, isNew:true},
+  {key:"seed-2", source:"NIPA(예시)", field:"기술", title:"2026년 AI 바우처 지원사업 수요기업 추가모집", agency:"과학기술정보통신부 / NIPA", period:"", summary:"AI 솔루션 도입 바우처 최대 2억 원. AI 도입을 원하는 중소기업 대상, 자부담 20%.", url:"https://www.nipa.kr", offsetEnd:5, isNew:false},
+  {key:"seed-3", source:"기업마당(예시)", field:"내수", title:"[서울] 2026년 하반기 유망기업 마케팅 지원사업 참여기업 모집", agency:"서울특별시 / 서울경제진흥원", period:"", summary:"온라인 마케팅·콘텐츠 제작비 최대 2,000만 원. 서울 소재 업력 7년 미만 기업 대상.", url:"https://www.bizinfo.go.kr", offsetEnd:22, isNew:true},
+  {key:"seed-4", source:"IRIS(예시)", field:"기술", title:"2026년 창업성장기술개발사업 디딤돌 과제 2차 시행계획 공고", agency:"중소벤처기업부 / 중소기업기술정보진흥원", period:"", summary:"기술개발비 최대 1.5억 원(1년). 업력 7년 이하, 매출 20억 미만 창업기업 대상. IRIS 접수.", url:"https://www.iris.go.kr", offsetEnd:35, isNew:true},
+  {key:"seed-5", source:"KOTRA(예시)", field:"수출", title:"2026년 수출바우처 사업 3차 참여기업 모집 공고", agency:"산업통상자원부·중기부 / KOTRA·중진공", period:"", summary:"해외마케팅·번역·인증 등 수출 지원 서비스 바우처. 수출 실적별 트랙 구분, 내수기업 트랙 포함.", url:"https://www.exportvoucher.com", offsetEnd:14, isNew:false},
+  {key:"seed-6", source:"소상공인24(예시)", field:"소상공인", title:"2026년 스마트상점 기술보급 사업 2차 모집 공고", agency:"중소벤처기업부 / 소상공인시장진흥공단", period:"", summary:"키오스크·스마트오더 등 스마트기술 도입비 70% 지원. 오프라인 매장 운영 소상공인 대상.", url:"https://www.sbiz24.kr", offsetEnd:17, isNew:false},
+  {key:"seed-7", source:"고용24(예시)", field:"인력", title:"2026년 청년일자리도약장려금 (상시 접수)", agency:"고용노동부", period:"상시", summary:"청년(15~34세) 정규직 채용 시 1인당 최대 720만 원 지원. 채용 전 참여 신청 필수.", url:"https://www.work24.go.kr", offsetEnd:null, isNew:false}
+];
+
+function normalize(raw){
+  const a = {
+    key: raw.key, source: raw.source||"기업마당", field: raw.field||"기타",
+    title: raw.title, agency: raw.agency||"", period: raw.period||"",
+    summary: raw.summary||"", url: raw.url||"#", registered: raw.registered||"", isNew: !!raw.isNew
+  };
+  if(raw.offsetEnd !== undefined){
+    a.deadlineDate = raw.offsetEnd===null ? null : new Date(TODAY.getTime()+raw.offsetEnd*86400000);
+  } else {
+    a.deadlineDate = parseDeadline(a.period);
+    const todayStr = new Date().toISOString().slice(0,10);
+    if(a.registered && a.registered.slice(0,10)===todayStr) a.isNew = true;
+  }
+  a.deadlineText = a.deadlineDate ? fmtDate(a.deadlineDate) : (a.period||"상시·원문 확인");
+  return a;
+}
+function rescoreAll(){
+  ANNS.forEach(a=>{
+    const r=scoreAnn(a); a.score=r.score; a.verdict=r.verdict; a.note=r.note; a.dday=ddayOf(a);
+    a.urgent = a.dday!==999 && a.dday>=0 && a.dday<=7;
+  });
+  ANNS.sort((x,y)=>y.score-x.score);
+}
+async function loadAnnouncements(){
+  let items=[];
+  try{
+    const r = await fetch("/api/announcements");
+    if(r.ok){ const d=await r.json(); if(d.items && d.items.length){ items=d.items; annSource="bizinfo"; } }
+  }catch(e){}
+  if(!items.length){ items=SEED; annSource="seed"; }
+  ANNS = items.map(normalize).filter(a=>a.dday===undefined || true);
+  rescoreAll();
+  ANNS = ANNS.filter(a=>ddayOf(a)===999 || ddayOf(a)>=-1);
+  const cats=[...new Set(ANNS.map(a=>a.field))].filter(Boolean);
+  const sel=document.getElementById("f-cat");
+  sel.innerHTML='<option value="">분야 전체</option>'+cats.map(c=>'<option>'+esc(c)+'</option>').join("");
+  document.getElementById("side-src").textContent = annSource==="bizinfo" ? "기업마당 실시간 연동 중 · "+ANNS.length+"건" : "예시 공고 표시 중 (설치가이드 5단계)";
+}
+
+/* ══ 인증 ══ */
+function enterDemo(){ userId=null; userEmail=null; if(!PROFILE.company){PROFILE={company:"(주)브릿지랩",industry:"IT 서비스 (SaaS)",founded:"2024",region:"서울",staff:"4명",revenue:"1.2억 원",descr:"중소기업 대상 AI 기반 CRM 구독 서비스, B2B 유료 고객 23개사",keywords:["#AI","#B2B","#마케팅","#수출"]};} enterApp(); }
+async function doLogin(){
+  if(DEMO_AUTH){ msg("login-msg","err","아직 데이터베이스가 연결되지 않았습니다. '가입 없이 둘러보기'를 이용하거나 설치가이드 2단계를 완료하세요."); return; }
+  const email=document.getElementById("login-email").value.trim();
+  const pw=document.getElementById("login-pw").value;
+  const btn=document.getElementById("login-btn"); btn.disabled=true;
+  const {data,error} = await sb.auth.signInWithPassword({email,password:pw});
+  btn.disabled=false;
+  if(error){ msg("login-msg","err","로그인에 실패했습니다: "+error.message); return; }
+  userId=data.user.id; userEmail=data.user.email;
+  await loadUserData(); enterApp();
+}
+async function doSignup(){
+  if(DEMO_AUTH){ msg("signup-msg","err","아직 데이터베이스가 연결되지 않았습니다. 설치가이드 2단계(Supabase 연결)를 완료하면 회원가입이 활성화됩니다."); return; }
+  const email=document.getElementById("su-email").value.trim();
+  const pw=document.getElementById("su-pw").value;
+  if(!email||pw.length<8){ msg("signup-msg","err","이메일을 입력하고 비밀번호는 8자 이상으로 설정하세요."); return; }
+  const btn=document.getElementById("su-btn"); btn.disabled=true;
+  const {data,error} = await sb.auth.signUp({email,password:pw});
+  btn.disabled=false;
+  if(error){ msg("signup-msg","err","가입에 실패했습니다: "+error.message); return; }
+  if(data.session){ userId=data.user.id; userEmail=data.user.email; go("onboarding"); }
+  else { msg("signup-msg","ok","확인 이메일을 발송했습니다. 메일함에서 인증 후 로그인하세요. (설치가이드에 인증 생략 방법이 있습니다)"); }
+}
+async function doLogout(){ if(sb) await sb.auth.signOut(); userId=null;userEmail=null; location.reload(); }
+async function loadUserData(){
+  if(!sb||!userId) return;
+  const {data:p} = await sb.from("profiles").select("*").eq("id",userId).maybeSingle();
+  if(p){ PROFILE={company:p.company||"",industry:p.industry||"",founded:p.founded||"",region:p.region||"",staff:p.staff||"",revenue:p.revenue||"",descr:p.descr||"",keywords:Array.isArray(p.keywords)?p.keywords:[]}; }
+  const {data:s} = await sb.from("scraps").select("*").eq("user_id",userId);
+  scraps={}; (s||[]).forEach(r=>scraps[r.ann_key]=r.status||"검토 중");
+}
+async function saveProfileRemote(){
+  if(!sb||!userId) return;
+  await sb.from("profiles").upsert({ id:userId, company:PROFILE.company, industry:PROFILE.industry, founded:PROFILE.founded, region:PROFILE.region, staff:PROFILE.staff, revenue:PROFILE.revenue, descr:PROFILE.descr, keywords:PROFILE.keywords, updated_at:new Date().toISOString() });
+}
+
+/* ══ 온보딩 ══ */
+function onbStep(n){
+  for(let i=1;i<=3;i++){ document.getElementById("onb-"+i).classList.toggle("hidden", i!==n); document.getElementById("st"+i).classList.toggle("on", i<=n); }
+}
+async function finishOnboarding(){
+  PROFILE.company=document.getElementById("onb-company").value.trim();
+  PROFILE.industry=document.getElementById("onb-industry").value;
+  PROFILE.founded=document.getElementById("onb-founded").value.trim();
+  PROFILE.region=document.getElementById("onb-region").value;
+  PROFILE.staff=document.getElementById("onb-staff").value.trim();
+  PROFILE.revenue=document.getElementById("onb-revenue").value.trim();
+  PROFILE.descr=document.getElementById("onb-desc").value.trim();
+  PROFILE.keywords=document.getElementById("onb-kw").value.split(",").map(s=>s.trim()).filter(Boolean).map(k=>k.startsWith("#")?k:"#"+k);
+  const btn=document.getElementById("onb-done"); btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 저장 중…';
+  await saveProfileRemote();
+  btn.disabled=false; btn.textContent="완료 — 브리핑 시작하기";
+  enterApp();
+}
+
+/* ══ 라우팅 ══ */
+const AUTH_VIEWS=["login","signup","onboarding"];
+function go(v){
+  currentView=v;
+  const isAuth=AUTH_VIEWS.includes(v);
+  document.getElementById("app").classList.toggle("hidden", isAuth);
+  document.getElementById("bottom-nav").style.display=isAuth?"none":"";
+  document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
+  const el=document.getElementById("view-"+v); if(el) el.classList.add("active");
+  document.querySelectorAll("[data-nav]").forEach(b=>b.classList.toggle("active",b.dataset.nav===v));
+  closeDrawers(); window.scrollTo(0,0);
+  if(v==="dashboard")renderDash();
+  if(v==="search")renderSearch();
+  if(v==="scrap")renderScrap();
+  if(v==="calendar")renderCal();
+  if(v==="profile")fillProfileForm();
+}
+function enterApp(){
+  document.getElementById("side-user").textContent = userEmail ? userEmail : "체험 모드";
+  document.getElementById("alert-email").textContent = userEmail||"로그인 후 설정";
+  document.getElementById("greet-name").textContent = greet();
+  document.getElementById("today-str").textContent = fmtDate(new Date());
+  go("dashboard");
+}
+
+/* ══ 렌더: 대시보드 ══ */
+function stampHtml(a,sm){
+  const cls=(a.score>=80?"":(a.score>=60?"mid":"low"))+(sm?" sm":"");
+  const w=a.score>=80?"적합":(a.score>=60?"검토":"낮음");
+  return '<div class="stamp '+cls+'"><span class="score">'+a.score+'</span><span class="word">'+w+'</span></div>';
+}
+function ddayHtml(a){
+  if(a.dday===999) return '<span class="dday">상시</span>';
+  if(a.dday<0) return '<span class="dday">마감</span>';
+  return '<span class="dday '+(a.dday<=7?"urgent":"")+'">D-'+a.dday+'</span>';
+}
+let dashFilter="all";
+function matchedList(){ const m=ANNS.filter(a=>a.score>=70); return m.length?m:ANNS.slice(0,4); }
+function renderDash(){
+  rescoreAll();
+  const matched=matchedList();
+  const urgentCnt=matched.filter(a=>a.urgent).length;
+  document.getElementById("nav-cnt").textContent=matched.length;
+  document.getElementById("stat-match").textContent=matched.length;
+  document.getElementById("stat-urgent").textContent=urgentCnt;
+  document.getElementById("stat-scrap").textContent=Object.keys(scraps).length;
+  document.getElementById("brief-title").innerHTML =
+    annSource==="loading" ? "공고를 수집하고 있습니다…" :
+    '수집된 공고 <span class="hl">'+ANNS.length+'건</span> 중<br>'+esc(greet())+' 사업에 맞는 <span class="hl">'+matched.length+'건</span>을 찾았습니다.';
+  document.getElementById("brief-sub").textContent =
+    annSource==="bizinfo" ? "기업마당(정부부처·지자체·공공기관 통합) 실시간 공고 기준" : "예시 공고입니다. 기업마당 API 키를 연결하면(설치가이드 5단계) 실제 공고로 바뀝니다.";
+  const list=matched.filter(a=>{
+    if(dashFilter==="urgent")return a.urgent;
+    if(dashFilter==="new")return a.isNew;
+    if(dashFilter==="scrap")return scraps[a.key]!==undefined;
+    return true;
+  });
+  document.getElementById("dash-cards").innerHTML = list.length ? list.map(cardHtml).join("") :
+    '<div class="empty">조건에 맞는 공고가 없습니다.<br>프로필 키워드를 늘리거나 문서를 학습시키면 매칭 폭이 넓어집니다.</div>';
+  const t=document.getElementById("mini-profile");
+  t.innerHTML =
+    '<div class="row"><span class="k">회사명</span><span class="v">'+esc(PROFILE.company||"미등록")+'</span></div>'+
+    '<div class="row"><span class="k">업종</span><span class="v">'+esc(PROFILE.industry||"-")+'</span></div>'+
+    '<div class="row"><span class="k">설립</span><span class="v">'+esc(PROFILE.founded||"-")+'</span></div>'+
+    '<div class="row"><span class="k">소재지</span><span class="v">'+esc(PROFILE.region||"-")+'</span></div>';
+  document.getElementById("mini-kw").innerHTML=(PROFILE.keywords||[]).map(k=>'<span class="kw-chip">'+esc(k)+'</span>').join("")||'<span class="mini-note">키워드가 없습니다 — 프로필에서 추가하세요</span>';
+}
+function cardHtml(a){
+  const idx=ANNS.indexOf(a);
+  const scrapped=scraps[a.key]!==undefined;
+  return '<article class="card">'+
+    '<div><div class="card-eyebrow"><span class="src">'+esc(a.source)+'</span><span class="dot"></span><span>'+esc(a.field)+'</span>'+(a.isNew?'<span class="badge-new">오늘 신규</span>':"")+'</div>'+
+    '<h2 class="card-title"><button onclick="openDetail('+idx+')">'+esc(a.title)+'</button></h2>'+
+    '<p class="card-summary">'+esc(a.summary||"요약 정보가 없습니다. 원문 공고를 확인하세요.")+'</p>'+
+    '<p class="match-note">'+esc(a.note)+'</p></div>'+
+    '<div class="stamp-col">'+stampHtml(a)+ddayHtml(a)+'</div>'+
+    '<div class="card-foot">'+
+    '<button class="btn btn-primary" onclick="openGuide('+idx+')">✍ 작성 가이드</button>'+
+    '<button class="btn" onclick="openDetail('+idx+')">상세 보기</button>'+
+    '<a class="btn" href="'+esc(a.url)+'" target="_blank" rel="noopener">원문 ↗</a>'+
+    '<span class="deadline-info">마감 '+esc(a.deadlineText)+'</span>'+
+    '<button class="btn-scrap '+(scrapped?"on":"")+'" onclick="toggleScrap('+idx+')">'+(scrapped?"★ 스크랩됨":"☆ 스크랩")+'</button>'+
+    '</div></article>';
+}
+document.getElementById("dash-tabs").addEventListener("click",e=>{
+  const t=e.target.closest(".tab"); if(!t)return;
+  document.querySelectorAll("#dash-tabs .tab").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active"); dashFilter=t.dataset.f; renderDash();
+});
+
+/* ══ 스크랩 ══ */
+async function toggleScrap(idx){
+  const a=ANNS[idx];
+  if(scraps[a.key]!==undefined){
+    delete scraps[a.key];
+    if(sb&&userId) await sb.from("scraps").delete().eq("user_id",userId).eq("ann_key",a.key);
+  }else{
+    scraps[a.key]="검토 중";
+    if(sb&&userId) await sb.from("scraps").upsert({user_id:userId,ann_key:a.key,title:a.title,deadline:a.deadlineText,url:a.url,status:"검토 중"});
+  }
+  if(currentView==="dashboard")renderDash();
+  if(currentView==="search")renderSearch();
+  if(currentView==="scrap")renderScrap();
+  if(currentView==="detail")openDetail(idx,true);
+}
+async function setStatus(idx,st){
+  const a=ANNS[idx]; scraps[a.key]=st;
+  if(sb&&userId) await sb.from("scraps").update({status:st}).eq("user_id",userId).eq("ann_key",a.key);
+  renderScrap();
+}
+function renderScrap(){
+  const list=ANNS.map((a,i)=>({a,i})).filter(x=>scraps[x.a.key]!==undefined);
+  document.getElementById("scrap-list").innerHTML = list.length ? list.map(({a,i})=>{
+    const st=scraps[a.key];
+    return '<div class="scrap-row">'+stampHtml(a,true)+
+      '<div class="info"><button class="t" style="background:none;border:none;padding:0;font-weight:700;font-size:14.5px;text-align:left;color:inherit;line-height:1.45;" onclick="openDetail('+i+')">'+esc(a.title)+'</button>'+
+      '<div style="font-size:12px;color:var(--ink-soft);margin-top:3px;">'+esc(a.source)+' · 마감 '+esc(a.deadlineText)+' · '+(a.dday===999?"상시":(a.dday<0?"마감":"D-"+a.dday))+'</div></div>'+
+      '<span class="badge-status '+(STCLASS[st]||"")+'">'+esc(st)+'</span>'+
+      '<select onchange="setStatus('+i+',this.value)">'+STATUS.map(s=>'<option '+(s===st?"selected":"")+'>'+s+'</option>').join("")+'</select>'+
+      '<button class="btn" onclick="openGuide('+i+')">가이드</button>'+
+      '<button class="btn-scrap on" style="margin-left:0;" onclick="toggleScrap('+i+')">해제</button></div>';
+  }).join("") : '<div class="empty">아직 스크랩한 공고가 없습니다.<br>브리핑이나 검색에서 ☆를 눌러 담아두면 마감 캘린더에 표시됩니다.</div>';
+}
+
+/* ══ 검색 ══ */
+function renderSearch(){
+  const q=(document.getElementById("q").value||"").toLowerCase();
+  const cat=document.getElementById("f-cat").value;
+  const sort=document.getElementById("f-sort").value;
+  let list=ANNS.filter(a=>(!q||(a.title+" "+a.summary+" "+a.field).toLowerCase().includes(q))&&(!cat||a.field===cat));
+  if(sort==="dday") list=[...list].sort((x,y)=>(x.dday<0?9999:x.dday)-(y.dday<0?9999:y.dday));
+  else if(sort==="new") list=[...list].sort((x,y)=>String(y.registered).localeCompare(String(x.registered)));
+  else list=[...list].sort((x,y)=>y.score-x.score);
+  document.getElementById("result-count").textContent="진행 중 공고 "+list.length+"건 · 적합도는 내 프로필 기준";
+  document.getElementById("search-list").innerHTML = list.length ? list.map(a=>{
+    const i=ANNS.indexOf(a); const scrapped=scraps[a.key]!==undefined;
+    return '<div class="ann-row">'+stampHtml(a,true)+
+      '<div class="info"><button class="t" onclick="openDetail('+i+')">'+esc(a.title)+'</button>'+
+      '<div class="m"><span class="src">'+esc(a.source)+'</span><span>·</span><span>'+esc(a.field)+'</span><span>·</span>'+ddayHtml(a)+'</div></div>'+
+      '<button class="btn-scrap '+(scrapped?"on":"")+'" style="margin-left:0;" onclick="toggleScrap('+i+')">'+(scrapped?"★":"☆")+'</button>'+
+      '<button class="btn" onclick="openDetail('+i+')">상세</button></div>';
+  }).join("") : '<div class="empty">검색 결과가 없습니다. 검색어나 필터를 바꿔보세요.</div>';
+}
+
+/* ══ 상세 ══ */
+function checklistFor(a){
+  const items=[];
+  const m=a.title.match(/^\[([^\]]+)\]/);
+  const reg=String(PROFILE.region||"").slice(0,2);
+  if(m) items.push({ok:!reg||m[1].includes(reg)||/전국/.test(m[1]), t:"지역 요건 ("+m[1]+")", why:reg?("내 소재지: "+PROFILE.region):"프로필에 소재지를 등록하세요"});
+  else items.push({ok:true, t:"지역 제한 표기 없음", why:"원문에서 세부 지역 요건을 확인하세요"});
+  if(a.dday!==999) items.push({ok:a.dday>=3, t:"접수 기간", why:a.dday<0?"이미 마감된 공고입니다":(a.dday<=2?"마감 임박 — 서류 준비 시간이 촉박합니다":"D-"+a.dday+", 준비 가능")});
+  else items.push({ok:true, t:"상시 접수", why:"예산 소진 시 조기 마감될 수 있습니다"});
+  items.push({ok:false, t:"세부 자격 (업력·매출·중복수혜)", why:"AI가 원문 없이 판단할 수 없는 항목 — 반드시 원문 공고에서 확인"});
+  return items;
+}
+function openDetail(idx){
+  const a=ANNS[idx]; const scrapped=scraps[a.key]!==undefined;
+  const similar=ANNS.filter(x=>x!==a&&x.field===a.field).slice(0,2);
+  document.getElementById("view-detail").innerHTML =
+    '<button class="back-link" onclick="go(\'dashboard\')">← 목록으로</button>'+
+    '<div class="detail-top"><div style="flex:1;">'+
+    '<div class="card-eyebrow"><span class="src">'+esc(a.source)+'</span><span class="dot"></span><span>'+esc(a.field)+'</span>'+(a.isNew?'<span class="badge-new">오늘 신규</span>':"")+'</div>'+
+    '<h1 class="detail-title">'+esc(a.title)+'</h1></div>'+
+    '<div class="stamp-col" style="grid-row:auto;">'+stampHtml(a)+ddayHtml(a)+'</div></div>'+
+    '<div class="detail-grid"><div class="panel">'+
+    '<table class="meta-table">'+
+    '<tr><th>소관·주관</th><td>'+esc(a.agency||"원문 참조")+'</td></tr>'+
+    '<tr><th>접수 기간</th><td>'+esc(a.period||a.deadlineText)+'</td></tr>'+
+    '<tr><th>원문 공고</th><td><a href="'+esc(a.url)+'" target="_blank" rel="noopener" class="btn" style="padding:3px 9px;font-size:11.5px;">공고 페이지 열기 ↗</a></td></tr>'+
+    '</table>'+
+    '<div class="sec-title">공고 요약</div>'+
+    '<p style="font-size:13.5px;color:var(--ink-soft);line-height:1.7;">'+esc(a.summary||"요약 정보가 없습니다.")+'</p>'+
+    '<p class="match-note" style="margin-top:10px;">'+esc(a.note)+'</p>'+
+    '<div class="sec-title">신청 자격 체크 (내 프로필 대조)</div>'+
+    checklistFor(a).map(c=>'<div class="check-item"><span class="check-mark '+(c.ok?"ck-ok":"ck-warn")+'">'+(c.ok?"✓":"!")+'</span><div><b>'+esc(c.t)+'</b><span class="why">'+esc(c.why)+'</span></div></div>').join("")+
+    '<p class="mini-note">자동 체크는 참고용입니다. 최종 자격은 반드시 원문 공고로 확인하세요.</p>'+
+    '</div><div class="side-panels">'+
+    '<div class="panel"><h3>다음 행동</h3>'+
+    '<button class="btn btn-seal btn-lg" onclick="openGuide('+idx+')" style="margin-bottom:8px;">✍ 작성 가이드 열기</button>'+
+    '<button class="btn btn-lg" onclick="openChat('+idx+')" style="margin-bottom:8px;">이 공고에 대해 AI에게 질문</button>'+
+    '<button class="btn btn-lg" onclick="toggleScrap('+idx+')">'+(scrapped?"★ 스크랩 해제":"☆ 스크랩하고 캘린더에 담기")+'</button></div>'+
+    '<div class="panel"><h3>비슷한 공고</h3>'+
+    (similar.length?similar.map(x=>'<div style="padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:13px;"><button style="background:none;border:none;padding:0;font-weight:600;text-align:left;line-height:1.45;color:inherit;cursor:pointer;" onclick="openDetail('+ANNS.indexOf(x)+')">'+esc(x.title)+'</button><div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px;">적합도 '+x.score+' · '+(x.dday===999?"상시":"D-"+x.dday)+'</div></div>').join(""):'<p class="mini-note">같은 분야의 다른 공고가 없습니다.</p>')+
+    '</div></div></div>';
+  document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
+  document.getElementById("view-detail").classList.add("active");
+  currentView="detail"; closeDrawers(); window.scrollTo(0,0);
+}
+
+/* ══ 캘린더 ══ */
+let calY=TODAY.getFullYear(), calM=TODAY.getMonth();
+function calMove(d){ calM+=d; if(calM<0){calM=11;calY--;} if(calM>11){calM=0;calY++;} renderCal(); }
+function renderCal(){
+  document.getElementById("cal-title").textContent=calY+"년 "+(calM+1)+"월";
+  const first=new Date(calY,calM,1), days=new Date(calY,calM+1,0).getDate();
+  let html=["일","월","화","수","목","금","토"].map(d=>'<div class="wd">'+d+'</div>').join("");
+  for(let i=0;i<first.getDay();i++) html+='<div class="cal-cell"></div>';
+  for(let d=1;d<=days;d++){
+    const evs=ANNS.map((a,i)=>({a,i})).filter(({a})=>a.deadlineDate&&a.deadlineDate.getFullYear()===calY&&a.deadlineDate.getMonth()===calM&&a.deadlineDate.getDate()===d&&(a.score>=70||scraps[a.key]!==undefined));
+    const isToday=calY===TODAY.getFullYear()&&calM===TODAY.getMonth()&&d===TODAY.getDate();
+    html+='<div class="cal-cell '+(isToday?"today":"")+'"><span class="d">'+d+'</span>'+
+      evs.map(({a,i})=>'<div class="cal-ev '+(scraps[a.key]!==undefined?"":"navy")+'" onclick="openDetail('+i+')" title="'+esc(a.title)+'">'+esc(a.title.replace(/^\[[^\]]*\]\s*/,"").slice(0,14))+'… 마감</div>').join("")+'</div>';
+  }
+  document.getElementById("cal-grid").innerHTML=html;
+}
+
+/* ══ 프로필 ══ */
+function fillProfileForm(){
+  document.getElementById("p-company").value=PROFILE.company;
+  document.getElementById("p-industry").value=PROFILE.industry;
+  document.getElementById("p-founded").value=PROFILE.founded;
+  document.getElementById("p-region").value=PROFILE.region;
+  document.getElementById("p-staff").value=PROFILE.staff;
+  document.getElementById("p-revenue").value=PROFILE.revenue;
+  document.getElementById("p-desc").value=PROFILE.descr;
+  document.getElementById("p-kw").value=(PROFILE.keywords||[]).join(", ");
+}
+async function saveProfile(showMsg){
+  PROFILE.company=document.getElementById("p-company").value.trim();
+  PROFILE.industry=document.getElementById("p-industry").value.trim();
+  PROFILE.founded=document.getElementById("p-founded").value.trim();
+  PROFILE.region=document.getElementById("p-region").value.trim();
+  PROFILE.staff=document.getElementById("p-staff").value.trim();
+  PROFILE.revenue=document.getElementById("p-revenue").value.trim();
+  PROFILE.descr=document.getElementById("p-desc").value.trim();
+  PROFILE.keywords=document.getElementById("p-kw").value.split(",").map(s=>s.trim()).filter(Boolean).map(k=>k.startsWith("#")?k:"#"+k);
+  await saveProfileRemote(); rescoreAll();
+  if(showMsg){ const m=document.getElementById("p-save-msg"); m.textContent = (sb&&userId)?"저장되었습니다 ✓":"저장됨 (체험 모드 — 새로고침 시 초기화)"; setTimeout(()=>m.textContent="",3000); }
+}
+
+/* ══ Claude 호출 ══ */
+async function callClaude(messages,maxTokens){
+  maxTokens=maxTokens||1000;
+  try{
+    const r=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages,max_tokens:maxTokens})});
+    if(r.ok){ const d=await r.json(); if(d.text!==undefined) return d.text; }
+    const err=await r.json().catch(()=>({}));
+    if(err.error==="no_key") throw new Error("no_key");
+    throw new Error("proxy");
+  }catch(e){
+    if(e.message==="no_key") throw e;
+    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:maxTokens,messages})});
+    if(!r.ok) throw new Error("api");
+    const d=await r.json();
+    return d.content.filter(b=>b.type==="text").map(b=>b.text).join("\n");
+  }
+}
+function profileContext(){
+  return "[사용자 사업 프로필]\n회사: "+PROFILE.company+" / 업종: "+PROFILE.industry+" / 설립: "+PROFILE.founded+" / 소재지: "+PROFILE.region+" / 직원: "+PROFILE.staff+" / 작년 매출: "+PROFILE.revenue+"\n사업 소개: "+PROFILE.descr+"\n키워드: "+(PROFILE.keywords||[]).join(", ");
+}
+function claudeErrHtml(){
+  return '<div class="err-box"><b>AI 호출에 실패했습니다.</b><br>배포 후 Vercel 환경변수 ANTHROPIC_API_KEY가 설정되어 있는지 확인하세요 (설치가이드 4단계).</div>';
+}
+
+/* ══ 작성 가이드 + AI 초안 ══ */
+const guideCache={};
+function openGuide(idx){
+  const a=ANNS[idx];
+  document.getElementById("guide-title").textContent=a.title.replace(/^\[[^\]]*\]\s*/,"").slice(0,40)+" — 작성 가이드";
+  const body=document.getElementById("guide-body");
+  if(guideCache[a.key]){ body.innerHTML=guideCache[a.key]+'<div id="draft-area"></div>'; }
+  else{
+    body.innerHTML='<div class="guide-sec"><div class="sec-title" style="margin-top:0;">AI 맞춤 가이드</div><p>이 공고의 평가 포인트와 내 사업 기준 작성 전략을 Claude가 분석해 드립니다.</p><button class="btn btn-primary" id="gen-guide">가이드 생성하기</button></div><div id="guide-out"></div><div id="draft-area"></div>';
+    document.getElementById("gen-guide").onclick=async function(){
+      this.disabled=true; this.innerHTML='<span class="spinner"></span> 분석 중…';
+      try{
+        const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[지원사업 공고]\n"+a.title+"\n주관: "+a.agency+"\n요약: "+a.summary+"\n마감: "+a.deadlineText+"\n\n위 회사가 이 공고 지원을 검토 중이다. 다음 4개 섹션으로 한국어 답변: ## 평가 포인트(2~3문장) ## 추천 목차(4~5개 항목, 각 한 줄) ## 내 프로필 기반 전략(3~4문장, 회사 강점 활용) ## 주의사항(2~3개). 확실치 않은 규정은 원문 확인을 권고할 것. 전체 500자 내외."}],1200);
+        const html='<div class="guide-sec"><div class="draft-out">'+mdLite(raw)+'</div><p class="mini-note">AI 분석은 참고용입니다. 평가 기준과 자격은 원문 공고가 우선합니다.</p></div>';
+        guideCache[a.key]=html;
+        document.getElementById("guide-out").innerHTML=html;
+        document.getElementById("gen-guide").parentElement.classList.add("hidden");
+      }catch(e){ document.getElementById("guide-out").innerHTML=claudeErrHtml(); this.disabled=false; this.textContent="다시 시도"; }
+    };
+  }
+  const btn=document.getElementById("draft-btn");
+  btn.disabled=false; btn.textContent="AI 초안 생성";
+  btn.onclick=async function(){
+    const area=document.getElementById("draft-area");
+    btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 초안 작성 중…';
+    try{
+      const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[지원사업 공고]\n"+a.title+"\n요약: "+a.summary+"\n\n위 회사가 이 공고에 지원한다고 가정하고 사업계획서 핵심 파트 초안을 작성해라. 형식: ## 섹션 헤더 3~4개, 각 3~5문장. 회사의 실제 정보를 활용하고, 심사위원이 확인하고 싶어할 정량 지표는 [예: 월 리드 40건]처럼 대괄호로 제안. 한국어 500자 내외."}],1400);
+      area.innerHTML='<div class="guide-sec"><div class="sec-title">AI 생성 초안</div><div class="draft-out">'+mdLite(raw)+'</div><p class="mini-note">초안은 출발점입니다. 수치를 확인한 뒤 공고 양식에 맞춰 다듬으세요.</p></div>';
+      btn.textContent="다시 생성";
+    }catch(e){ area.innerHTML=claudeErrHtml(); btn.textContent="AI 초안 생성"; }
+    btn.disabled=false;
+  };
+  document.getElementById("guide-drawer").classList.add("open");
+  document.getElementById("chat-drawer").classList.remove("open");
+  document.getElementById("overlay").classList.add("open");
+}
+
+/* ══ AI 채팅 ══ */
+let chatHistory=[], chatContext=null;
+function addMsg(role,text){
+  const b=document.getElementById("chat-body");
+  const d=document.createElement("div");
+  d.className="chat-msg "+(role==="user"?"user":"ai");
+  d.innerHTML=role==="user"?esc(text):mdLite(text);
+  b.appendChild(d); b.scrollTop=b.scrollHeight; return d;
+}
+function openChat(idx){
+  chatContext = idx!==undefined ? ANNS[idx] : null;
+  document.getElementById("chat-drawer").classList.add("open");
+  document.getElementById("guide-drawer").classList.remove("open");
+  document.getElementById("overlay").classList.add("open");
+  if(chatContext) addMsg("ai","「"+chatContext.title+"」에 대해 궁금한 점을 물어보세요. 마감: "+chatContext.deadlineText);
+  setTimeout(()=>document.getElementById("chat-input").focus(),300);
+}
+function quickAsk(q){document.getElementById("chat-input").value=q;sendChat();}
+async function sendChat(){
+  const inp=document.getElementById("chat-input");
+  const q=inp.value.trim(); if(!q)return;
+  inp.value=""; addMsg("user",q);
+  const loading=addMsg("ai","…");
+  chatHistory.push({role:"user",content:q});
+  try{
+    const sys="너는 '공고비서'라는 정부지원사업 매칭 서비스의 AI 어시스턴트다. 한국 정부지원사업(K-Startup, 기업마당, IRIS 등)에 대해 실용적으로 답한다. 3~5문장으로 간결하게, 한국어로. 확실하지 않은 규정은 반드시 \"원문 공고 확인이 필요하다\"고 명시해라.\n"+profileContext()+(chatContext?"\n[현재 보고 있는 공고]\n"+chatContext.title+" / "+chatContext.summary+" / 마감: "+chatContext.deadlineText:"");
+    const messages=[{role:"user",content:sys+"\n\n이어지는 대화에 답해라."},{role:"assistant",content:"네, 준비되었습니다."},...chatHistory.slice(-8)];
+    const raw=await callClaude(messages,800);
+    loading.innerHTML=mdLite(raw);
+    chatHistory.push({role:"assistant",content:raw});
+  }catch(e){ loading.innerHTML="답변을 가져오지 못했습니다. ANTHROPIC_API_KEY 설정(설치가이드 4단계)을 확인해 주세요."; chatHistory.pop(); }
+  document.getElementById("chat-body").scrollTop=1e9;
+}
+
+/* ══ 문서 학습 ══ */
+let uploadedFile=null;
+function onFilePick(input){
+  const f=input.files[0]; if(!f)return;
+  uploadedFile=f;
+  document.getElementById("dropzone").innerHTML='<b class="file-ok">✓ '+esc(f.name)+'</b>분석 준비 완료 — 아래 버튼을 누르세요';
+}
+async function analyzeDoc(){
+  const btn=document.getElementById("analyze-btn");
+  const out=document.getElementById("ai-out");
+  const paste=document.getElementById("doc-paste").value.trim();
+  if(!uploadedFile&&!paste){ out.innerHTML='<div class="err-box">파일을 올리거나 내용을 붙여넣은 뒤 분석을 시작하세요.</div>'; return; }
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Claude가 문서를 읽는 중…';
+  out.innerHTML="";
+  try{
+    const prompt='너는 정부지원사업 매칭 서비스의 분석 엔진이다. 아래 사업 문서를 읽고 반드시 JSON만 출력해라. 마크다운 코드펜스, 설명 문장 금지.\n스키마: {"summary":"2문장 사업 요약","strengths":["강점 3~4개"],"keywords":["#형태의 매칭 키워드 4~6개"],"fields":["추천 지원 분야 2~3개"],"improve":["사업계획서 보완 포인트 2~3개"]}';
+    let content;
+    if(uploadedFile&&uploadedFile.type==="application/pdf"){
+      const b64=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result.split(",")[1]);r.onerror=()=>no(new Error("read"));r.readAsDataURL(uploadedFile);});
+      content=[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:prompt+(paste?"\n\n[추가 메모]\n"+paste:"")}];
+    }else{
+      let txt=paste;
+      if(uploadedFile) txt=(await uploadedFile.text())+"\n\n"+paste;
+      content=prompt+"\n\n[문서 내용]\n"+txt.slice(0,20000);
+    }
+    const raw=await callClaude([{role:"user",content}],1000);
+    const r=JSON.parse(raw.replace(/```json|```/g,"").trim());
+    (r.keywords||[]).forEach(k=>{const kk=k.startsWith("#")?k:"#"+k; if(!PROFILE.keywords.includes(kk)&&PROFILE.keywords.length<12)PROFILE.keywords.push(kk);});
+    document.getElementById("p-kw").value=PROFILE.keywords.join(", ");
+    await saveProfileRemote(); rescoreAll();
+    out.innerHTML='<div class="ai-result"><span class="ai-badge">CLAUDE 분석 결과 — 프로필에 반영됨</span>'+
+      '<h4>사업 요약</h4><p style="color:var(--ink-soft);line-height:1.7;">'+esc(r.summary||"")+'</p>'+
+      '<h4>강점</h4><ul>'+(r.strengths||[]).map(s=>'<li>'+esc(s)+'</li>').join("")+'</ul>'+
+      '<h4>자동 추가된 매칭 키워드</h4><div class="kw" style="border:none;padding:0;margin:0;">'+(r.keywords||[]).map(k=>'<span class="kw-chip">'+esc(k)+'</span>').join("")+'</div>'+
+      '<h4>추천 지원 분야</h4><p style="color:var(--ink-soft);">'+(r.fields||[]).map(esc).join(" · ")+'</p>'+
+      '<h4>사업계획서 보완 포인트</h4><ul>'+(r.improve||[]).map(s=>'<li>'+esc(s)+'</li>').join("")+'</ul></div>';
+  }catch(e){
+    out.innerHTML = e.message==="no_key" ? claudeErrHtml() : '<div class="err-box"><b>분석에 실패했습니다.</b><br>파일이 너무 크지 않은지, ANTHROPIC_API_KEY가 설정되어 있는지 확인해 주세요.</div>';
+  }
+  btn.disabled=false; btn.textContent="Claude로 분석해서 학습하기";
+}
+
+/* ══ 드로어 공통 ══ */
+function closeDrawers(){
+  document.getElementById("guide-drawer").classList.remove("open");
+  document.getElementById("chat-drawer").classList.remove("open");
+  document.getElementById("overlay").classList.remove("open");
+}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawers();});
+
+/* ══ 부팅 ══ */
+(async function init(){
+  if(DEMO_AUTH) document.getElementById("demo-banner").classList.remove("hidden");
+  document.getElementById("today-str").textContent=fmtDate(new Date());
+  await loadAnnouncements();
+  if(sb){
+    const {data} = await sb.auth.getSession();
+    if(data&&data.session){
+      userId=data.session.user.id; userEmail=data.session.user.email;
+      await loadUserData();
+      if(!PROFILE.company){ enterApp(); go("onboarding"); document.getElementById("app").classList.add("hidden"); }
+      else enterApp();
+      return;
+    }
+  }
+  go("login");
+})();
+</script>
+</body>
+</html>
