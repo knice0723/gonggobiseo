@@ -34,7 +34,7 @@ async function fetchBizinfo(key) {
   else for (const k of Object.keys(json)) {
     if (Array.isArray(json[k]) && json[k].length && typeof json[k][0] === "object") { list = json[k]; break; }
   }
-  if (!list) return { items: [], note: "응답에서 공고 배열을 찾지 못함: " + Object.keys(json).join(",").slice(0, 80) };
+  if (!list) return { items: [], note: "기업마당 서버 응답: " + JSON.stringify(json).replace(/\s+/g, " ").slice(0, 200) };
   const items = list.map((it) => {
     const title = it.pblancNm || it.pblancnm || it.title || "";
     if (!title) return null;
