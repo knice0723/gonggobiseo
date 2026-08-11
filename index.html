@@ -296,10 +296,15 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
 </head>
 <body>
 
+<div id="boot" style="position:fixed;inset:0;background:var(--paper);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+  <div class="logo-seal" style="width:54px;height:54px;font-size:25px;">고</div>
+  <div class="spinner dark"></div>
+</div>
+
 <div id="demo-banner" class="demo-banner hidden">체험 모드로 실행 중입니다 — 회원가입·저장 기능은 Supabase 연결(설치가이드 2단계) 후 활성화됩니다.</div>
 
 <!-- ═══ 로그인 ═══ -->
-<div id="view-login" class="view active">
+<div id="view-login" class="view">
   <div class="auth-wrap"><div class="auth-card">
     <div class="auth-logo"><div class="logo-seal">告</div><b>공고비서</b></div>
     <p class="auth-sub">매일 아침, 내 사업에 맞는 정부지원사업만<br>골라서 보고드립니다.</p>
@@ -354,7 +359,7 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     <div id="onb-3" class="hidden">
       <div class="step-label">3단계 / 3단계 · 선택</div>
       <h2 class="onb-title">사업계획서로 학습시키기</h2>
-      <p class="onb-sub">사업계획서를 올리면 Claude가 읽고 매칭 기준을 더 정교하게 만듭니다. 나중에 프로필 메뉴에서도 할 수 있습니다.</p>
+      <p class="onb-sub">사업계획서를 올리면 GPT가 읽고 매칭 기준을 더 정교하게 만듭니다. 나중에 프로필 메뉴에서도 할 수 있습니다.</p>
       <button class="btn btn-seal btn-lg" id="onb-done" onclick="finishOnboarding()">완료 — 브리핑 시작하기</button>
       <p class="auth-alt"><button onclick="finishOnboarding()">건너뛰기</button></p>
     </div>
@@ -364,7 +369,7 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
 <!-- ═══ 앱 ═══ -->
 <div id="app" class="app hidden">
   <aside class="sidebar">
-    <div class="logo"><div class="logo-seal">告</div><div class="logo-name">공고비서<small>정부지원사업 매칭</small></div></div>
+    <div class="logo" onclick="go('dashboard')" style="cursor:pointer;" title="메인으로"><div class="logo-seal">告</div><div class="logo-name">공고비서<small>정부지원사업 매칭</small></div></div>
     <div class="nav-label">브리핑</div>
     <button class="nav-item" data-nav="dashboard" onclick="go('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-8 9 8M5 10v10h14V10"/></svg>오늘의 맞춤 공고 <span class="cnt" id="nav-cnt">0</span></button>
     <button class="nav-item" data-nav="search" onclick="go('search')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>전체 공고 검색</button>
@@ -372,14 +377,14 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     <button class="nav-item" data-nav="scrap" onclick="go('scrap')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4V3z"/></svg>스크랩 · 지원 현황</button>
     <div class="nav-label">AI</div>
     <button class="nav-item" data-nav="profile" onclick="go('profile')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5M5 3h9l5 5v13H5V3z"/></svg>사업 프로필 · 문서 학습</button>
-    <button class="nav-item" onclick="openChat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/></svg>AI에게 질문하기</button>
+    <button class="nav-item" onclick="openChat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/></svg>GPT에게 질문하기</button>
     <div class="nav-label">설정</div>
     <button class="nav-item" data-nav="alerts" onclick="go('alerts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a2 2 0 003.4 0"/></svg>알림 설정</button>
-    <div class="sidebar-foot"><span id="side-user">체험 모드</span><br><span id="side-src">공고 수집 대기 중</span><br><button onclick="doLogout()">로그아웃</button></div>
+    <div class="sidebar-foot"><span id="side-user">체험 모드</span><br><span id="side-src">공고 수집 대기 중</span><br><span style="font-size:11px;">공고 출처: 창업진흥원 K-Startup(공공데이터포털) · 중소벤처기업부 기업마당(연동 예정)</span><br><button onclick="doLogout()">로그아웃</button></div>
   </aside>
 
   <main class="main">
-    <div class="mobile-brand"><div class="logo-seal">告</div><div class="logo-name">공고비서</div></div>
+    <div class="mobile-brand" onclick="go('dashboard')" style="cursor:pointer;"><div class="logo-seal">告</div><div class="logo-name">공고비서</div></div>
 
     <div id="view-dashboard" class="view">
       <header class="doc-head">
@@ -421,7 +426,7 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     </div>
 
     <div id="view-search" class="view">
-      <div class="page-head"><h1>전체 공고 검색</h1><p id="search-desc">수집된 진행 중 공고를 검색합니다. 적합도는 내 프로필 기준으로 자동 계산됩니다.</p></div>
+      <div class="page-head"><h1>전체 공고 검색</h1><p id="search-desc">수집된 진행 중 공고를 검색합니다. 적합도는 내 프로필 기준으로 자동 계산됩니다.<br><span style="font-size:12px;color:var(--ink-faint);">출처: 창업진흥원 K-Startup(공공데이터포털), 중소벤처기업부 기업마당(API 신청 중 · 연동 예정)</span></p></div>
       <div class="search-bar">
         <input id="q" type="search" placeholder="공고명, 키워드 검색 (예: 마케팅, R&D, 수출)" oninput="renderSearch()">
         <select id="f-cat" onchange="renderSearch()"><option value="">분야 전체</option></select>
@@ -434,7 +439,11 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     <div id="view-detail" class="view"></div>
 
     <div id="view-calendar" class="view">
-      <div class="page-head"><h1>마감 캘린더</h1><p>맞춤 공고(남색)와 스크랩 공고(빨강)의 접수 마감일입니다.</p></div>
+      <div class="page-head"><h1>마감 캘린더</h1><p>스크랩 공고(빨강)와 맞춤·전체 공고(남색)의 접수 마감일입니다.</p></div>
+      <div class="tabs" id="cal-tabs" style="margin-bottom:14px;">
+        <button class="tab active" data-cm="match">맞춤·스크랩</button>
+        <button class="tab" data-cm="all">전체 공고</button>
+      </div>
       <div class="cal">
         <div class="cal-head"><b id="cal-title"></b><div class="nav"><button onclick="calMove(-1)">◀</button><button onclick="calMove(1)">▶</button></div></div>
         <div class="cal-grid" id="cal-grid"></div>
@@ -464,17 +473,24 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
             <div class="field"><label>작년 매출</label><input type="text" id="p-revenue"></div>
           </div>
           <div class="field"><label>사업 소개</label><textarea id="p-desc" rows="4"></textarea></div>
+          <div class="field"><label>주요 제품·서비스</label><input type="text" id="p-products" placeholder="예: AI 작곡 SaaS, 음원 커머스"></div>
+          <div class="grid2">
+            <div class="field"><label>타깃 고객</label><input type="text" id="p-target" placeholder="예: 콘텐츠 제작사, 1인 크리에이터"></div>
+            <div class="field"><label>보유 인증·특허·연구소</label><input type="text" id="p-certs" placeholder="예: 벤처인증, 특허 2건"></div>
+          </div>
+          <div class="field"><label>필요한 지원 (자금·판로·수출·R&D 등)</label><input type="text" id="p-needs" placeholder="예: 사업화 자금, 해외 마케팅"></div>
           <div class="field"><label>매칭 키워드 (쉼표로 구분해 수정 가능)</label><input type="text" id="p-kw"><div class="hint">문서를 학습시키면 키워드가 자동으로 추가됩니다.</div></div>
           <button class="btn btn-primary" id="p-save" onclick="saveProfile(true)">프로필 저장</button>
           <span id="p-save-msg" style="font-size:12.5px;color:var(--ok);margin-left:8px;"></span>
         </div>
         <div class="panel">
-          <h3><span>문서 학습 <span class="ai-badge" style="margin-left:6px;">Claude 연결</span></span></h3>
-          <p style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;line-height:1.65;">사업계획서·회사소개서·IR 자료를 올리면 Claude가 읽고 ① 사업 요약 ② 강점 ③ 매칭 키워드 ④ 추천 지원 분야를 추출해 프로필에 반영합니다.</p>
+          <h3><span>문서 학습 <span class="ai-badge" style="margin-left:6px;">GPT 연결</span></span></h3>
+          <p style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;line-height:1.65;">사업계획서·회사소개서·IR 자료를 올리면 GPT가 읽고 ① 사업 요약 ② 강점 ③ 매칭 키워드 ④ 추천 지원 분야를 추출해 프로필에 반영합니다.</p>
+          <div id="learned-doc"></div>
           <input type="file" id="doc-file" accept=".pdf,.txt,.md" class="hidden" onchange="onFilePick(this)">
           <div class="dropzone" onclick="document.getElementById('doc-file').click()" id="dropzone"><b>파일 올리기 (PDF, TXT)</b>클릭해서 사업계획서를 선택하세요</div>
           <div class="field" style="margin-top:12px;"><label>또는 내용 붙여넣기</label><textarea id="doc-paste" rows="5" placeholder="사업계획서나 회사 소개 내용을 붙여넣어도 됩니다."></textarea></div>
-          <button class="btn btn-seal btn-lg" id="analyze-btn" onclick="analyzeDoc()">Claude로 분석해서 학습하기</button>
+          <button class="btn btn-seal btn-lg" id="analyze-btn" onclick="analyzeDoc()">GPT로 분석해서 학습하기</button>
           <div id="ai-out"></div>
         </div>
       </div>
@@ -506,12 +522,12 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
 <aside class="drawer" id="guide-drawer">
   <div class="drawer-head"><h2 id="guide-title"></h2><button class="close" onclick="closeDrawers()">✕</button></div>
   <div class="drawer-body" id="guide-body"></div>
-  <div class="drawer-foot"><button class="btn btn-seal" id="draft-btn">AI 초안 생성</button><button class="btn" onclick="closeDrawers()">닫기</button></div>
+  <div class="drawer-foot"><button class="btn btn-seal" id="draft-btn">GPT 초안 생성</button><button class="btn" onclick="closeDrawers()">닫기</button></div>
 </aside>
 
 <!-- 드로어: AI 채팅 -->
 <aside class="drawer" id="chat-drawer">
-  <div class="drawer-head"><h2>공고비서 AI에게 질문 <span class="ai-badge" style="margin-left:4px;">Claude</span></h2><button class="close" onclick="closeDrawers()">✕</button></div>
+  <div class="drawer-head"><h2>공고비서 GPT에게 질문 <span class="ai-badge" style="margin-left:4px;">GPT</span></h2><button class="close" onclick="closeDrawers()">✕</button></div>
   <div class="drawer-body chat-body" id="chat-body">
     <div class="chat-msg ai">안녕하세요. 지원사업이나 신청 요건에 대해 무엇이든 물어보세요. 등록된 사업 프로필을 바탕으로 답변드립니다.</div>
   </div>
@@ -554,7 +570,7 @@ const STCLASS = {"검토 중":"st-review","작성 중":"st-writing","제출 완�
 
 let PROFILE = {
   company:"", industry:"", founded:"", region:"", staff:"", revenue:"",
-  descr:"", keywords:[]
+  descr:"", keywords:[], extra:{}
 };
 
 /* ══ 유틸 ══ */
@@ -587,6 +603,8 @@ function scoreAnn(a){
   (PROFILE.keywords||[]).forEach(k=>String(k).replace(/^#/,"").split(/[·,\s/]+/).forEach(w=>{if(w.length>=2)words.add(w.toLowerCase());}));
   String(PROFILE.industry||"").split(/[()\s·,/]+/).forEach(w=>{if(w.length>=2)words.add(w.toLowerCase());});
   String(PROFILE.descr||"").split(/[\s,.()·/]+/).forEach(w=>{if(w.length>=3)words.add(w.toLowerCase());});
+  const _ex=PROFILE.extra||{};
+  String((_ex.products||"")+" "+(_ex.target||"")+" "+(_ex.needs||"")).split(/[\s,.()·/]+/).forEach(w=>{if(w.length>=2)words.add(w.toLowerCase());});
   const hits=[...words].filter(w=>text.includes(w));
   s += Math.min(hits.length*7, 28);
   if(hits.length) reasons.push("프로필 키워드 일치: "+hits.slice(0,3).join(", "));
@@ -642,7 +660,7 @@ async function loadAnnouncements(){
   let items=[];
   try{
     const r = await fetch("/api/announcements");
-    if(r.ok){ const d=await r.json(); if(d.items && d.items.length){ items=d.items; annSource="bizinfo"; } }
+    if(r.ok){ const d=await r.json(); if(d.items && d.items.length){ items=d.items; annSource=d.source||"live"; } }
   }catch(e){}
   if(!items.length){ items=SEED; annSource="seed"; }
   ANNS = items.map(normalize).filter(a=>a.dday===undefined || true);
@@ -651,11 +669,19 @@ async function loadAnnouncements(){
   const cats=[...new Set(ANNS.map(a=>a.field))].filter(Boolean);
   const sel=document.getElementById("f-cat");
   sel.innerHTML='<option value="">분야 전체</option>'+cats.map(c=>'<option>'+esc(c)+'</option>').join("");
-  document.getElementById("side-src").textContent = annSource==="bizinfo" ? "기업마당 실시간 연동 중 · "+ANNS.length+"건" : "예시 공고 표시 중 (설치가이드 5단계)";
+  document.getElementById("side-src").textContent = (annSource==="seed") ? "예시 공고 표시 중" : srcLabel()+" 실시간 연동 · "+ANNS.length+"건";
 }
 
+function srcLabel(){
+  if(annSource==="bizinfo+kstartup") return "K-Startup + 기업마당";
+  if(annSource==="kstartup") return "K-Startup(창업진흥원)";
+  if(annSource==="bizinfo") return "기업마당(중소벤처기업부)";
+  return "예시 데이터";
+}
+function bootDone(){ var b=document.getElementById("boot"); if(b) b.classList.add("hidden"); }
+
 /* ══ 인증 ══ */
-function enterDemo(){ userId=null; userEmail=null; if(!PROFILE.company){PROFILE={company:"(주)브릿지랩",industry:"IT 서비스 (SaaS)",founded:"2024",region:"서울",staff:"4명",revenue:"1.2억 원",descr:"중소기업 대상 AI 기반 CRM 구독 서비스, B2B 유료 고객 23개사",keywords:["#AI","#B2B","#마케팅","#수출"]};} enterApp(); }
+function enterDemo(){ userId=null; userEmail=null; if(!PROFILE.company){PROFILE={company:"(주)브릿지랩",industry:"IT 서비스 (SaaS)",founded:"2024",region:"서울",staff:"4명",revenue:"1.2억 원",descr:"중소기업 대상 AI 기반 CRM 구독 서비스, B2B 유료 고객 23개사",keywords:["#AI","#B2B","#마케팅","#수출"],extra:{}};} enterApp(); }
 async function doLogin(){
   if(DEMO_AUTH){ msg("login-msg","err","아직 데이터베이스가 연결되지 않았습니다. '가입 없이 둘러보기'를 이용하거나 설치가이드 2단계를 완료하세요."); return; }
   const email=document.getElementById("login-email").value.trim();
@@ -683,13 +709,13 @@ async function doLogout(){ if(sb) await sb.auth.signOut(); userId=null;userEmail
 async function loadUserData(){
   if(!sb||!userId) return;
   const {data:p} = await sb.from("profiles").select("*").eq("id",userId).maybeSingle();
-  if(p){ PROFILE={company:p.company||"",industry:p.industry||"",founded:p.founded||"",region:p.region||"",staff:p.staff||"",revenue:p.revenue||"",descr:p.descr||"",keywords:Array.isArray(p.keywords)?p.keywords:[]}; }
+  if(p){ PROFILE={company:p.company||"",industry:p.industry||"",founded:p.founded||"",region:p.region||"",staff:p.staff||"",revenue:p.revenue||"",descr:p.descr||"",keywords:Array.isArray(p.keywords)?p.keywords:[],extra:(p.extra&&typeof p.extra==="object")?p.extra:{}}; }
   const {data:s} = await sb.from("scraps").select("*").eq("user_id",userId);
   scraps={}; (s||[]).forEach(r=>scraps[r.ann_key]=r.status||"검토 중");
 }
 async function saveProfileRemote(){
   if(!sb||!userId) return;
-  await sb.from("profiles").upsert({ id:userId, company:PROFILE.company, industry:PROFILE.industry, founded:PROFILE.founded, region:PROFILE.region, staff:PROFILE.staff, revenue:PROFILE.revenue, descr:PROFILE.descr, keywords:PROFILE.keywords, updated_at:new Date().toISOString() });
+  await sb.from("profiles").upsert({ id:userId, company:PROFILE.company, industry:PROFILE.industry, founded:PROFILE.founded, region:PROFILE.region, staff:PROFILE.staff, revenue:PROFILE.revenue, descr:PROFILE.descr, keywords:PROFILE.keywords, extra:PROFILE.extra||{}, doc_summary:(PROFILE.extra&&PROFILE.extra.doc&&PROFILE.extra.doc.summary)||"", updated_at:new Date().toISOString() });
 }
 
 /* ══ 온보딩 ══ */
@@ -761,7 +787,8 @@ function renderDash(){
     annSource==="loading" ? "공고를 수집하고 있습니다…" :
     '수집된 공고 <span class="hl">'+ANNS.length+'건</span> 중<br>'+esc(greet())+' 사업에 맞는 <span class="hl">'+matched.length+'건</span>을 찾았습니다.';
   document.getElementById("brief-sub").textContent =
-    annSource==="bizinfo" ? "기업마당(정부부처·지자체·공공기관 통합) 실시간 공고 기준" : "예시 공고입니다. 기업마당 API 키를 연결하면(설치가이드 5단계) 실제 공고로 바뀝니다.";
+    annSource==="seed" ? "예시 공고입니다. API 키를 연결하면 실제 공고로 바뀝니다." :
+    "출처: "+srcLabel()+(annSource.indexOf("bizinfo")<0?" · 기업마당(중소벤처기업부)은 API 신청 중, 연동 예정":"")+" · 매일 자동 갱신";
   const list=matched.filter(a=>{
     if(dashFilter==="urgent")return a.urgent;
     if(dashFilter==="new")return a.isNew;
@@ -891,7 +918,7 @@ function openDetail(idx){
     '</div><div class="side-panels">'+
     '<div class="panel"><h3>다음 행동</h3>'+
     '<button class="btn btn-seal btn-lg" onclick="openGuide('+idx+')" style="margin-bottom:8px;">✍ 작성 가이드 열기</button>'+
-    '<button class="btn btn-lg" onclick="openChat('+idx+')" style="margin-bottom:8px;">이 공고에 대해 AI에게 질문</button>'+
+    '<button class="btn btn-lg" onclick="openChat('+idx+')" style="margin-bottom:8px;">이 공고에 대해 GPT에게 질문</button>'+
     '<button class="btn btn-lg" onclick="toggleScrap('+idx+')">'+(scrapped?"★ 스크랩 해제":"☆ 스크랩하고 캘린더에 담기")+'</button></div>'+
     '<div class="panel"><h3>비슷한 공고</h3>'+
     (similar.length?similar.map(x=>'<div style="padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:13px;"><button style="background:none;border:none;padding:0;font-weight:600;text-align:left;line-height:1.45;color:inherit;cursor:pointer;" onclick="openDetail('+ANNS.indexOf(x)+')">'+esc(x.title)+'</button><div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px;">적합도 '+x.score+' · '+(x.dday===999?"상시":"D-"+x.dday)+'</div></div>').join(""):'<p class="mini-note">같은 분야의 다른 공고가 없습니다.</p>')+
@@ -902,7 +929,12 @@ function openDetail(idx){
 }
 
 /* ══ 캘린더 ══ */
-let calY=TODAY.getFullYear(), calM=TODAY.getMonth();
+let calY=TODAY.getFullYear(), calM=TODAY.getMonth(), calMode="match";
+document.getElementById("cal-tabs").addEventListener("click",function(e){
+  var t=e.target.closest(".tab"); if(!t)return;
+  document.querySelectorAll("#cal-tabs .tab").forEach(function(x){x.classList.remove("active");});
+  t.classList.add("active"); calMode=t.dataset.cm; renderCal();
+});
 function calMove(d){ calM+=d; if(calM<0){calM=11;calY--;} if(calM>11){calM=0;calY++;} renderCal(); }
 function renderCal(){
   document.getElementById("cal-title").textContent=calY+"년 "+(calM+1)+"월";
@@ -910,10 +942,12 @@ function renderCal(){
   let html=["일","월","화","수","목","금","토"].map(d=>'<div class="wd">'+d+'</div>').join("");
   for(let i=0;i<first.getDay();i++) html+='<div class="cal-cell"></div>';
   for(let d=1;d<=days;d++){
-    const evs=ANNS.map((a,i)=>({a,i})).filter(({a})=>a.deadlineDate&&a.deadlineDate.getFullYear()===calY&&a.deadlineDate.getMonth()===calM&&a.deadlineDate.getDate()===d&&(a.score>=70||scraps[a.key]!==undefined));
+    const evs=ANNS.map((a,i)=>({a,i})).filter(({a})=>a.deadlineDate&&a.deadlineDate.getFullYear()===calY&&a.deadlineDate.getMonth()===calM&&a.deadlineDate.getDate()===d&&(calMode==="all"||a.score>=70||scraps[a.key]!==undefined));
     const isToday=calY===TODAY.getFullYear()&&calM===TODAY.getMonth()&&d===TODAY.getDate();
+    const shown=evs.slice(0,3);
     html+='<div class="cal-cell '+(isToday?"today":"")+'"><span class="d">'+d+'</span>'+
-      evs.map(({a,i})=>'<div class="cal-ev '+(scraps[a.key]!==undefined?"":"navy")+'" onclick="openDetail('+i+')" title="'+esc(a.title)+'">'+esc(a.title.replace(/^\[[^\]]*\]\s*/,"").slice(0,14))+'… 마감</div>').join("")+'</div>';
+      shown.map(({a,i})=>'<div class="cal-ev '+(scraps[a.key]!==undefined?"":"navy")+'" onclick="openDetail('+i+')" title="'+esc(a.title)+'">'+esc(a.title.replace(/^\[[^\]]*\]\s*/,"").slice(0,14))+'… 마감</div>').join("")+
+      (evs.length>3?'<div class="cal-ev" style="background:none;color:var(--ink-faint);cursor:default;">외 '+(evs.length-3)+'건</div>':'')+'</div>';
   }
   document.getElementById("cal-grid").innerHTML=html;
 }
@@ -928,6 +962,23 @@ function fillProfileForm(){
   document.getElementById("p-revenue").value=PROFILE.revenue;
   document.getElementById("p-desc").value=PROFILE.descr;
   document.getElementById("p-kw").value=(PROFILE.keywords||[]).join(", ");
+  const ex=PROFILE.extra||{};
+  document.getElementById("p-products").value=ex.products||"";
+  document.getElementById("p-target").value=ex.target||"";
+  document.getElementById("p-certs").value=ex.certs||"";
+  document.getElementById("p-needs").value=ex.needs||"";
+  renderLearnedDoc();
+}
+function renderLearnedDoc(){
+  const el=document.getElementById("learned-doc"); if(!el) return;
+  const d=PROFILE.extra&&PROFILE.extra.doc;
+  el.innerHTML = d ? '<div class="ai-result" style="margin:0 0 14px;">'+
+    '<span class="ai-badge">학습된 문서 · 저장됨'+(d.at?(' · '+esc(d.at)):'')+'</span>'+
+    '<h4>사업 요약</h4><p style="color:var(--ink-soft);line-height:1.7;">'+esc(d.summary||"")+'</p>'+
+    '<h4>강점</h4><ul>'+((d.strengths||[]).map(function(s){return '<li>'+esc(s)+'</li>';}).join(""))+'</ul>'+
+    '<h4>추천 지원 분야</h4><p style="color:var(--ink-soft);">'+((d.fields||[]).map(esc).join(" · "))+'</p>'+
+    '<h4>보완 포인트</h4><ul>'+((d.improve||[]).map(function(s){return '<li>'+esc(s)+'</li>';}).join(""))+'</ul>'+
+    '<p class="mini-note">이 내용은 프로필에 저장되어 매칭과 GPT 답변에 계속 활용됩니다. 새 문서를 분석하면 갱신됩니다.</p></div>' : "";
 }
 async function saveProfile(showMsg){
   PROFILE.company=document.getElementById("p-company").value.trim();
@@ -938,6 +989,11 @@ async function saveProfile(showMsg){
   PROFILE.revenue=document.getElementById("p-revenue").value.trim();
   PROFILE.descr=document.getElementById("p-desc").value.trim();
   PROFILE.keywords=document.getElementById("p-kw").value.split(",").map(s=>s.trim()).filter(Boolean).map(k=>k.startsWith("#")?k:"#"+k);
+  PROFILE.extra=PROFILE.extra||{};
+  PROFILE.extra.products=document.getElementById("p-products").value.trim();
+  PROFILE.extra.target=document.getElementById("p-target").value.trim();
+  PROFILE.extra.certs=document.getElementById("p-certs").value.trim();
+  PROFILE.extra.needs=document.getElementById("p-needs").value.trim();
   await saveProfileRemote(); rescoreAll();
   if(showMsg){ const m=document.getElementById("p-save-msg"); m.textContent = (sb&&userId)?"저장되었습니다 ✓":"저장됨 (체험 모드 — 새로고침 시 초기화)"; setTimeout(()=>m.textContent="",3000); }
 }
@@ -945,25 +1001,43 @@ async function saveProfile(showMsg){
 /* ══ Claude 호출 ══ */
 async function callClaude(messages,maxTokens){
   maxTokens=maxTokens||1000;
+  let proxyReached=false;
   try{
     const r=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages,max_tokens:maxTokens})});
-    if(r.ok){ const d=await r.json(); if(d.text!==undefined) return d.text; }
-    const err=await r.json().catch(()=>({}));
-    if(err.error==="no_key") throw new Error("no_key");
-    throw new Error("proxy");
+    proxyReached=true;
+    const d=await r.json().catch(()=>null);
+    if(r.ok&&d&&d.text!==undefined) return d.text;
+    let detail="HTTP "+r.status;
+    if(d){ detail=d.message||(d.error&&d.error.message)||(typeof d.error==="string"?d.error:detail); }
+    if(r.status===413) detail="전송 용량 초과 — 파일이 너무 큽니다. 더 작은 PDF를 쓰거나 내용 붙여넣기로 시도하세요.";
+    throw new Error("SERVER::"+detail);
   }catch(e){
-    if(e.message==="no_key") throw e;
-    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:maxTokens,messages})});
-    if(!r.ok) throw new Error("api");
-    const d=await r.json();
-    return d.content.filter(b=>b.type==="text").map(b=>b.text).join("\n");
+    if(String(e&&e.message).indexOf("SERVER::")===0) throw e;
+    if(proxyReached) throw new Error("SERVER::응답을 처리하지 못했습니다 ("+(e&&e.message?e.message:"원인 미상")+")");
   }
+  // 서버(/api)에 접근할 수 없는 환경(미리보기 등)에서만 쓰는 예비 경로
+  const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:maxTokens,messages})});
+  if(!r.ok) throw new Error("SERVER::AI 서버에 연결하지 못했습니다.");
+  const d=await r.json();
+  return d.content.filter(b=>b.type==="text").map(b=>b.text).join("\n");
 }
+function errDetail(e){ const s=String(e&&e.message||""); return s.indexOf("SERVER::")===0 ? s.slice(8) : ""; }
 function profileContext(){
-  return "[사용자 사업 프로필]\n회사: "+PROFILE.company+" / 업종: "+PROFILE.industry+" / 설립: "+PROFILE.founded+" / 소재지: "+PROFILE.region+" / 직원: "+PROFILE.staff+" / 작년 매출: "+PROFILE.revenue+"\n사업 소개: "+PROFILE.descr+"\n키워드: "+(PROFILE.keywords||[]).join(", ");
+  const ex=PROFILE.extra||{};
+  let s="[사용자 사업 프로필]\n회사: "+PROFILE.company+" / 업종: "+PROFILE.industry+" / 설립: "+PROFILE.founded+" / 소재지: "+PROFILE.region+" / 직원: "+PROFILE.staff+" / 작년 매출: "+PROFILE.revenue+"\n사업 소개: "+PROFILE.descr+"\n키워드: "+(PROFILE.keywords||[]).join(", ");
+  if(ex.products) s+="\n주요 제품·서비스: "+ex.products;
+  if(ex.target) s+="\n타깃 고객: "+ex.target;
+  if(ex.certs) s+="\n보유 인증·특허: "+ex.certs;
+  if(ex.needs) s+="\n필요한 지원: "+ex.needs;
+  if(ex.doc&&ex.doc.summary){
+    s+="\n[학습된 사업계획서]\n요약: "+ex.doc.summary;
+    if(ex.doc.strengths&&ex.doc.strengths.length) s+="\n강점: "+ex.doc.strengths.join(", ");
+  }
+  return s;
 }
-function claudeErrHtml(){
-  return '<div class="err-box"><b>AI 호출에 실패했습니다.</b><br>배포 후 Vercel 환경변수 ANTHROPIC_API_KEY가 설정되어 있는지 확인하세요 (설치가이드 4단계).</div>';
+function claudeErrHtml(e){
+  const d=errDetail(e);
+  return '<div class="err-box"><b>AI 호출에 실패했습니다.</b><br>'+(d?('서버 메시지: '+esc(d)+'<br><br>'):'')+'확인할 것: ① Vercel → Settings → Environment Variables 에 <b>OPENAI_API_KEY</b>가 정확한 이름으로 등록되어 있는지 ② 등록한 뒤 <b>Redeploy</b>를 했는지 ③ OpenAI 계정에 결제/크레딧이 있는지.</div>';
 }
 
 /* ══ 작성 가이드 + AI 초안 ══ */
@@ -974,7 +1048,7 @@ function openGuide(idx){
   const body=document.getElementById("guide-body");
   if(guideCache[a.key]){ body.innerHTML=guideCache[a.key]+'<div id="draft-area"></div>'; }
   else{
-    body.innerHTML='<div class="guide-sec"><div class="sec-title" style="margin-top:0;">AI 맞춤 가이드</div><p>이 공고의 평가 포인트와 내 사업 기준 작성 전략을 Claude가 분석해 드립니다.</p><button class="btn btn-primary" id="gen-guide">가이드 생성하기</button></div><div id="guide-out"></div><div id="draft-area"></div>';
+    body.innerHTML='<div class="guide-sec"><div class="sec-title" style="margin-top:0;">AI 맞춤 가이드</div><p>이 공고의 평가 포인트와 내 사업 기준 작성 전략을 GPT가 분석해 드립니다.</p><button class="btn btn-primary" id="gen-guide">가이드 생성하기</button></div><div id="guide-out"></div><div id="draft-area"></div>';
     document.getElementById("gen-guide").onclick=async function(){
       this.disabled=true; this.innerHTML='<span class="spinner"></span> 분석 중…';
       try{
@@ -983,19 +1057,19 @@ function openGuide(idx){
         guideCache[a.key]=html;
         document.getElementById("guide-out").innerHTML=html;
         document.getElementById("gen-guide").parentElement.classList.add("hidden");
-      }catch(e){ document.getElementById("guide-out").innerHTML=claudeErrHtml(); this.disabled=false; this.textContent="다시 시도"; }
+      }catch(e){ document.getElementById("guide-out").innerHTML=claudeErrHtml(e); this.disabled=false; this.textContent="다시 시도"; }
     };
   }
   const btn=document.getElementById("draft-btn");
-  btn.disabled=false; btn.textContent="AI 초안 생성";
+  btn.disabled=false; btn.textContent="GPT 초안 생성";
   btn.onclick=async function(){
     const area=document.getElementById("draft-area");
     btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 초안 작성 중…';
     try{
       const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[지원사업 공고]\n"+a.title+"\n요약: "+a.summary+"\n\n위 회사가 이 공고에 지원한다고 가정하고 사업계획서 핵심 파트 초안을 작성해라. 형식: ## 섹션 헤더 3~4개, 각 3~5문장. 회사의 실제 정보를 활용하고, 심사위원이 확인하고 싶어할 정량 지표는 [예: 월 리드 40건]처럼 대괄호로 제안. 한국어 500자 내외."}],1400);
-      area.innerHTML='<div class="guide-sec"><div class="sec-title">AI 생성 초안</div><div class="draft-out">'+mdLite(raw)+'</div><p class="mini-note">초안은 출발점입니다. 수치를 확인한 뒤 공고 양식에 맞춰 다듬으세요.</p></div>';
+      area.innerHTML='<div class="guide-sec"><div class="sec-title">GPT 생성 초안</div><div class="draft-out">'+mdLite(raw)+'</div><p class="mini-note">초안은 출발점입니다. 수치를 확인한 뒤 공고 양식에 맞춰 다듬으세요.</p></div>';
       btn.textContent="다시 생성";
-    }catch(e){ area.innerHTML=claudeErrHtml(); btn.textContent="AI 초안 생성"; }
+    }catch(e){ area.innerHTML=claudeErrHtml(e); btn.textContent="GPT 초안 생성"; }
     btn.disabled=false;
   };
   document.getElementById("guide-drawer").classList.add("open");
@@ -1033,7 +1107,7 @@ async function sendChat(){
     const raw=await callClaude(messages,800);
     loading.innerHTML=mdLite(raw);
     chatHistory.push({role:"assistant",content:raw});
-  }catch(e){ loading.innerHTML="답변을 가져오지 못했습니다. ANTHROPIC_API_KEY 설정(설치가이드 4단계)을 확인해 주세요."; chatHistory.pop(); }
+  }catch(e){ loading.innerHTML="답변을 가져오지 못했습니다. AI 키(OPENAI_API_KEY) 등록과 Redeploy 여부를 확인해 주세요."; chatHistory.pop(); }
   document.getElementById("chat-body").scrollTop=1e9;
 }
 
@@ -1049,7 +1123,10 @@ async function analyzeDoc(){
   const out=document.getElementById("ai-out");
   const paste=document.getElementById("doc-paste").value.trim();
   if(!uploadedFile&&!paste){ out.innerHTML='<div class="err-box">파일을 올리거나 내용을 붙여넣은 뒤 분석을 시작하세요.</div>'; return; }
-  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Claude가 문서를 읽는 중…';
+  if(uploadedFile&&uploadedFile.size>3500000){
+    out.innerHTML='<div class="err-box"><b>PDF가 너무 큽니다 ('+(uploadedFile.size/1048576).toFixed(1)+'MB).</b><br>서버 전송 한도(약 4MB) 때문에 3.5MB 이하 파일만 분석할 수 있습니다.<br>해결 방법: ① PDF 압축 사이트(예: smallpdf)에서 용량 줄이기 ② 핵심 페이지만 추린 파일 사용 ③ 문서 내용을 복사해서 아래 붙여넣기 칸에 넣기</div>'; return;
+  }
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> GPT가 문서를 읽는 중…';
   out.innerHTML="";
   try{
     const prompt='너는 정부지원사업 매칭 서비스의 분석 엔진이다. 아래 사업 문서를 읽고 반드시 JSON만 출력해라. 마크다운 코드펜스, 설명 문장 금지.\n스키마: {"summary":"2문장 사업 요약","strengths":["강점 3~4개"],"keywords":["#형태의 매칭 키워드 4~6개"],"fields":["추천 지원 분야 2~3개"],"improve":["사업계획서 보완 포인트 2~3개"]}';
@@ -1063,20 +1140,24 @@ async function analyzeDoc(){
       content=prompt+"\n\n[문서 내용]\n"+txt.slice(0,20000);
     }
     const raw=await callClaude([{role:"user",content}],1000);
-    const r=JSON.parse(raw.replace(/```json|```/g,"").trim());
+    const cleaned=raw.replace(/```json|```/g,"").trim();
+    const mjson=cleaned.match(/\{[\s\S]*\}/);
+    const r=JSON.parse(mjson?mjson[0]:cleaned);
     (r.keywords||[]).forEach(k=>{const kk=k.startsWith("#")?k:"#"+k; if(!PROFILE.keywords.includes(kk)&&PROFILE.keywords.length<12)PROFILE.keywords.push(kk);});
     document.getElementById("p-kw").value=PROFILE.keywords.join(", ");
-    await saveProfileRemote(); rescoreAll();
-    out.innerHTML='<div class="ai-result"><span class="ai-badge">CLAUDE 분석 결과 — 프로필에 반영됨</span>'+
+    PROFILE.extra=PROFILE.extra||{};
+    PROFILE.extra.doc={summary:r.summary||"",strengths:r.strengths||[],fields:r.fields||[],improve:r.improve||[],at:fmtDate(new Date())};
+    await saveProfileRemote(); rescoreAll(); renderLearnedDoc();
+    out.innerHTML='<div class="ai-result"><span class="ai-badge">GPT 분석 결과 — 프로필에 반영됨</span>'+
       '<h4>사업 요약</h4><p style="color:var(--ink-soft);line-height:1.7;">'+esc(r.summary||"")+'</p>'+
       '<h4>강점</h4><ul>'+(r.strengths||[]).map(s=>'<li>'+esc(s)+'</li>').join("")+'</ul>'+
       '<h4>자동 추가된 매칭 키워드</h4><div class="kw" style="border:none;padding:0;margin:0;">'+(r.keywords||[]).map(k=>'<span class="kw-chip">'+esc(k)+'</span>').join("")+'</div>'+
       '<h4>추천 지원 분야</h4><p style="color:var(--ink-soft);">'+(r.fields||[]).map(esc).join(" · ")+'</p>'+
       '<h4>사업계획서 보완 포인트</h4><ul>'+(r.improve||[]).map(s=>'<li>'+esc(s)+'</li>').join("")+'</ul></div>';
   }catch(e){
-    out.innerHTML = e.message==="no_key" ? claudeErrHtml() : '<div class="err-box"><b>분석에 실패했습니다.</b><br>파일이 너무 크지 않은지, ANTHROPIC_API_KEY가 설정되어 있는지 확인해 주세요.</div>';
+    out.innerHTML = errDetail(e) ? claudeErrHtml(e) : '<div class="err-box"><b>분석에 실패했습니다.</b><br>AI 응답을 해석하지 못했습니다. 한 번 더 시도해 보시고, 반복되면 파일 대신 내용 붙여넣기로 시도해 주세요.</div>';
   }
-  btn.disabled=false; btn.textContent="Claude로 분석해서 학습하기";
+  btn.disabled=false; btn.textContent="GPT로 분석해서 학습하기";
 }
 
 /* ══ 드로어 공통 ══ */
@@ -1099,10 +1180,12 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawers();});
       await loadUserData();
       if(!PROFILE.company){ enterApp(); go("onboarding"); document.getElementById("app").classList.add("hidden"); }
       else enterApp();
+      bootDone();
       return;
     }
   }
   go("login");
+  bootDone();
 })();
 </script>
 </body>
