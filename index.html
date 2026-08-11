@@ -89,7 +89,7 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
 @media(max-width:480px){.grid2{grid-template-columns:1fr;}}
 
 .app{display:grid;grid-template-columns:232px 1fr;min-height:100vh;}
-.main{padding:28px 36px 110px;max-width:1180px;width:100%;margin:0 auto;}
+.main{padding:22px 40px 110px;max-width:1720px;width:100%;margin:0 auto;}
 .sidebar{border-right:1px solid var(--line);background:var(--card);padding:24px 16px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;overflow-y:auto;}
 .logo{display:flex;align-items:center;gap:10px;padding:4px 10px 20px;}
 .logo-name{font-family:"Noto Serif KR",serif;font-weight:900;font-size:19px;letter-spacing:-.02em;}
@@ -109,6 +109,9 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
 .page-head h1{font-family:"Noto Serif KR",serif;font-weight:900;font-size:23px;letter-spacing:-.02em;}
 .page-head p{font-size:13.5px;color:var(--ink-soft);margin-top:4px;}
 .mobile-brand{display:none;align-items:center;gap:9px;margin-bottom:16px;}
+.topbar{display:flex;justify-content:flex-end;align-items:center;gap:12px;font-size:12.5px;color:var(--ink-soft);margin-bottom:8px;}
+.topbar button{background:none;border:none;color:var(--ink-soft);font-size:12.5px;text-decoration:underline;text-underline-offset:2px;padding:0;}
+.doc-chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;background:var(--paper);border:1px solid var(--line);border-radius:99px;padding:3px 11px;color:var(--ink-soft);font-weight:600;}
 
 .doc-head{border-top:3px solid var(--ink);border-bottom:1px solid var(--line);padding:18px 0 20px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;}
 .doc-meta{display:flex;gap:18px;font-size:12.5px;color:var(--ink-soft);margin-bottom:10px;flex-wrap:wrap;}
@@ -309,8 +312,8 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     <div class="auth-logo"><div class="logo-seal">告</div><b>공고비서</b></div>
     <p class="auth-sub">매일 아침, 내 사업에 맞는 정부지원사업만<br>골라서 보고드립니다.</p>
     <div id="login-msg"></div>
-    <div class="field"><label>이메일</label><input type="email" id="login-email" placeholder="you@company.com" autocomplete="email"></div>
-    <div class="field"><label>비밀번호</label><input type="password" id="login-pw" placeholder="••••••••" autocomplete="current-password"></div>
+    <div class="field"><label>이메일</label><input type="email" id="login-email" placeholder="you@company.com" autocomplete="email" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="field"><label>비밀번호</label><input type="password" id="login-pw" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn btn-primary btn-lg" id="login-btn" onclick="doLogin()">로그인</button>
     <p class="auth-alt">아직 계정이 없으신가요? <button onclick="go('signup')">회원가입</button></p>
     <div class="auth-demo"><button class="btn" onclick="enterDemo()">가입 없이 둘러보기 →</button></div>
@@ -323,8 +326,8 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     <div class="auth-logo"><div class="logo-seal">告</div><b>회원가입</b></div>
     <p class="auth-sub">가입 후 사업 정보를 등록하면<br>맞춤 공고 매칭이 시작됩니다.</p>
     <div id="signup-msg"></div>
-    <div class="field"><label>이메일</label><input type="email" id="su-email" placeholder="you@company.com" autocomplete="email"></div>
-    <div class="field"><label>비밀번호</label><input type="password" id="su-pw" placeholder="8자 이상" autocomplete="new-password"><div class="hint">8자 이상 입력하세요</div></div>
+    <div class="field"><label>이메일</label><input type="email" id="su-email" placeholder="you@company.com" autocomplete="email" onkeydown="if(event.key==='Enter')doSignup()"></div>
+    <div class="field"><label>비밀번호</label><input type="password" id="su-pw" placeholder="8자 이상" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignup()"><div class="hint">8자 이상 입력하세요</div></div>
     <button class="btn btn-seal btn-lg" id="su-btn" onclick="doSignup()">가입하고 사업 정보 등록하기</button>
     <p class="auth-alt">이미 계정이 있으신가요? <button onclick="go('login')">로그인</button></p>
   </div></div>
@@ -359,7 +362,7 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     <div id="onb-3" class="hidden">
       <div class="step-label">3단계 / 3단계 · 선택</div>
       <h2 class="onb-title">사업계획서로 학습시키기</h2>
-      <p class="onb-sub">사업계획서를 올리면 GPT가 읽고 매칭 기준을 더 정교하게 만듭니다. 나중에 프로필 메뉴에서도 할 수 있습니다.</p>
+      <p class="onb-sub">사업계획서를 올리면 AI 비서가 읽고 매칭 기준을 더 정교하게 만듭니다. 나중에 프로필 메뉴에서도 할 수 있습니다.</p>
       <button class="btn btn-seal btn-lg" id="onb-done" onclick="finishOnboarding()">완료 — 브리핑 시작하기</button>
       <p class="auth-alt"><button onclick="finishOnboarding()">건너뛰기</button></p>
     </div>
@@ -377,13 +380,14 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     <button class="nav-item" data-nav="scrap" onclick="go('scrap')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4V3z"/></svg>스크랩 · 지원 현황</button>
     <div class="nav-label">AI</div>
     <button class="nav-item" data-nav="profile" onclick="go('profile')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5M5 3h9l5 5v13H5V3z"/></svg>사업 프로필 · 문서 학습</button>
-    <button class="nav-item" onclick="openChat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/></svg>GPT에게 질문하기</button>
+    <button class="nav-item" onclick="openChat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/></svg>AI 비서에게 질문하기</button>
     <div class="nav-label">설정</div>
     <button class="nav-item" data-nav="alerts" onclick="go('alerts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a2 2 0 003.4 0"/></svg>알림 설정</button>
-    <div class="sidebar-foot"><span id="side-user">체험 모드</span><br><span id="side-src">공고 수집 대기 중</span><br><span style="font-size:11px;">공고 출처: 창업진흥원 K-Startup(공공데이터포털) · 중소벤처기업부 기업마당(연동 예정)</span><br><button onclick="doLogout()">로그아웃</button></div>
+    <div class="sidebar-foot"><span id="side-src">공고 수집 대기 중</span><br><span style="font-size:11px;">공고 출처: 창업진흥원 K-Startup(공공데이터포털) · 중소벤처기업부 기업마당(연동 예정)</span></div>
   </aside>
 
   <main class="main">
+    <div class="topbar"><span id="top-user">체험 모드</span><span style="color:var(--line);">|</span><button onclick="doLogout()">로그아웃</button></div>
     <div class="mobile-brand" onclick="go('dashboard')" style="cursor:pointer;"><div class="logo-seal">告</div><div class="logo-name">공고비서</div></div>
 
     <div id="view-dashboard" class="view">
@@ -472,6 +476,14 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
             <div class="field"><label>직원 수</label><input type="text" id="p-staff"></div>
             <div class="field"><label>작년 매출</label><input type="text" id="p-revenue"></div>
           </div>
+          <div class="grid2">
+            <div class="field"><label>대표자명</label><input type="text" id="p-ceo" placeholder="홍길동"></div>
+            <div class="field"><label>기업 형태</label><select id="p-corp"><option value="">선택</option><option>법인사업자</option><option>개인사업자</option><option>예비창업자</option></select></div>
+          </div>
+          <div class="field"><label>3개년 매출</label><input type="text" id="p-rev3y" placeholder="예: 2024년 3.2억 → 2025년 6.8억 → 2026년 12억(예상)"></div>
+          <div class="field"><label>직원 구성</label><input type="text" id="p-staffmix" placeholder="예: 개발 5 · 디자인 1 · 영업 2 · 경영지원 2"></div>
+          <div class="field"><label>주요 연혁·성과</label><textarea id="p-history" rows="2" placeholder="예: 2025.03 시리즈A 20억 유치 / 2025.11 CES 혁신상"></textarea></div>
+          <div class="field"><label>투자 유치·수상 이력</label><input type="text" id="p-invest" placeholder="예: 시드 5억(2024), TIPS 선정"></div>
           <div class="field"><label>사업 소개</label><textarea id="p-desc" rows="4"></textarea></div>
           <div class="field"><label>주요 제품·서비스</label><input type="text" id="p-products" placeholder="예: AI 작곡 SaaS, 음원 커머스"></div>
           <div class="grid2">
@@ -484,13 +496,13 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
           <span id="p-save-msg" style="font-size:12.5px;color:var(--ok);margin-left:8px;"></span>
         </div>
         <div class="panel">
-          <h3><span>문서 학습 <span class="ai-badge" style="margin-left:6px;">GPT 연결</span></span></h3>
-          <p style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;line-height:1.65;">사업계획서·회사소개서·IR 자료를 올리면 GPT가 읽고 ① 사업 요약 ② 강점 ③ 매칭 키워드 ④ 추천 지원 분야를 추출해 프로필에 반영합니다.</p>
+          <h3><span>문서 학습 <span class="ai-badge" style="margin-left:6px;">AI 비서 연결</span></span></h3>
+          <p style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;line-height:1.65;">사업계획서·회사소개서·IR 자료를 올리면 AI 비서가 읽고 ① 사업 요약 ② 강점 ③ 매칭 키워드 ④ 추천 지원 분야를 추출해 프로필에 반영합니다.</p>
           <div id="learned-doc"></div>
           <input type="file" id="doc-file" accept=".pdf,.txt,.md" class="hidden" onchange="onFilePick(this)">
           <div class="dropzone" onclick="document.getElementById('doc-file').click()" id="dropzone"><b>파일 올리기 (PDF, TXT)</b>클릭해서 사업계획서를 선택하세요</div>
           <div class="field" style="margin-top:12px;"><label>또는 내용 붙여넣기</label><textarea id="doc-paste" rows="5" placeholder="사업계획서나 회사 소개 내용을 붙여넣어도 됩니다."></textarea></div>
-          <button class="btn btn-seal btn-lg" id="analyze-btn" onclick="analyzeDoc()">GPT로 분석해서 학습하기</button>
+          <button class="btn btn-seal btn-lg" id="analyze-btn" onclick="analyzeDoc()">AI 비서로 분석해서 학습하기</button>
           <div id="ai-out"></div>
         </div>
       </div>
@@ -506,6 +518,15 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
           <h3 style="margin-top:22px;">알림 조건</h3>
           <div class="alert-row"><div>적합도 기준 <span class="desc">이 점수 이상일 때 알림</span></div><select style="border:1px solid var(--line);border-radius:7px;padding:6px 10px;"><option>85점 이상</option><option selected>80점 이상</option><option>70점 이상</option></select></div>
           <div class="alert-row"><div>마감 임박 리마인더 <span class="desc">스크랩 공고 대상</span></div><select style="border:1px solid var(--line);border-radius:7px;padding:6px 10px;"><option selected>D-3</option><option>D-5</option><option>D-7</option></select></div>
+          <h3 style="margin-top:22px;">AI 비서 설정</h3>
+          <div class="alert-row"><div>AI 모델 <span class="desc">답변 품질과 비용에 영향을 줍니다</span></div>
+            <select id="ai-model" onchange="setModel(this.value)" style="border:1px solid var(--line);border-radius:7px;padding:6px 10px;">
+              <option value="gpt-5.6-terra">GPT-5.6 Terra — 균형 (기본)</option>
+              <option value="gpt-5.6-sol">GPT-5.6 Sol — 최고 품질</option>
+              <option value="gpt-5.6-luna">GPT-5.6 Luna — 저비용</option>
+              <option value="" disabled>Claude — 추후 지원</option>
+              <option value="" disabled>Gemini — 추후 지원</option>
+            </select></div>
           <p class="mini-note">이메일 자동 발송은 다음 업데이트에서 활성화됩니다. 지금은 접속 시 브리핑과 캘린더로 확인할 수 있습니다.</p>
         </div>
         <div class="panel">
@@ -522,12 +543,12 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
 <aside class="drawer" id="guide-drawer">
   <div class="drawer-head"><h2 id="guide-title"></h2><button class="close" onclick="closeDrawers()">✕</button></div>
   <div class="drawer-body" id="guide-body"></div>
-  <div class="drawer-foot"><button class="btn btn-seal" id="draft-btn">GPT 초안 생성</button><button class="btn" onclick="closeDrawers()">닫기</button></div>
+  <div class="drawer-foot"><button class="btn btn-seal" id="draft-btn">AI 초안 생성</button><button class="btn" onclick="closeDrawers()">닫기</button></div>
 </aside>
 
 <!-- 드로어: AI 채팅 -->
 <aside class="drawer" id="chat-drawer">
-  <div class="drawer-head"><h2>공고비서 GPT에게 질문 <span class="ai-badge" style="margin-left:4px;">GPT</span></h2><button class="close" onclick="closeDrawers()">✕</button></div>
+  <div class="drawer-head"><h2>AI 비서에게 질문 <span class="ai-badge" style="margin-left:4px;">AI</span></h2><button class="close" onclick="closeDrawers()">✕</button></div>
   <div class="drawer-body chat-body" id="chat-body">
     <div class="chat-msg ai">안녕하세요. 지원사업이나 신청 요건에 대해 무엇이든 물어보세요. 등록된 사업 프로필을 바탕으로 답변드립니다.</div>
   </div>
@@ -679,6 +700,13 @@ function srcLabel(){
   return "예시 데이터";
 }
 function bootDone(){ var b=document.getElementById("boot"); if(b) b.classList.add("hidden"); }
+let navInit=false;
+function pushNav(state){ try{ if(!navInit){ history.replaceState(state,"","#"+(state.v||"")); navInit=true; } else { history.pushState(state,"","#"+(state.v||"")); } }catch(e){} }
+window.addEventListener("popstate",function(e){
+  const s=e.state||{};
+  if(s.v==="detail"&&typeof s.idx==="number"&&ANNS[s.idx]){ openDetail(s.idx,true); return; }
+  if(s.v){ go(s.v,true); }
+});
 
 /* ══ 인증 ══ */
 function enterDemo(){ userId=null; userEmail=null; if(!PROFILE.company){PROFILE={company:"(주)브릿지랩",industry:"IT 서비스 (SaaS)",founded:"2024",region:"서울",staff:"4명",revenue:"1.2억 원",descr:"중소기업 대상 AI 기반 CRM 구독 서비스, B2B 유료 고객 23개사",keywords:["#AI","#B2B","#마케팅","#수출"],extra:{}};} enterApp(); }
@@ -739,7 +767,7 @@ async function finishOnboarding(){
 
 /* ══ 라우팅 ══ */
 const AUTH_VIEWS=["login","signup","onboarding"];
-function go(v){
+function go(v, fromPop){
   currentView=v;
   const isAuth=AUTH_VIEWS.includes(v);
   document.getElementById("app").classList.toggle("hidden", isAuth);
@@ -753,9 +781,11 @@ function go(v){
   if(v==="scrap")renderScrap();
   if(v==="calendar")renderCal();
   if(v==="profile")fillProfileForm();
+  if(v==="alerts"){var _ms=document.getElementById("ai-model"); if(_ms)_ms.value=(PROFILE.extra&&PROFILE.extra.model)||"gpt-5.6-terra";}
+  if(!fromPop) pushNav({v:v});
 }
 function enterApp(){
-  document.getElementById("side-user").textContent = userEmail ? userEmail : "체험 모드";
+  document.getElementById("top-user").textContent = userEmail ? userEmail : "체험 모드";
   document.getElementById("alert-email").textContent = userEmail||"로그인 후 설정";
   document.getElementById("greet-name").textContent = greet();
   document.getElementById("today-str").textContent = fmtDate(new Date());
@@ -894,7 +924,7 @@ function checklistFor(a){
   items.push({ok:false, t:"세부 자격 (업력·매출·중복수혜)", why:"AI가 원문 없이 판단할 수 없는 항목 — 반드시 원문 공고에서 확인"});
   return items;
 }
-function openDetail(idx){
+function openDetail(idx, fromPop){
   const a=ANNS[idx]; const scrapped=scraps[a.key]!==undefined;
   const similar=ANNS.filter(x=>x!==a&&x.field===a.field).slice(0,2);
   document.getElementById("view-detail").innerHTML =
@@ -918,7 +948,7 @@ function openDetail(idx){
     '</div><div class="side-panels">'+
     '<div class="panel"><h3>다음 행동</h3>'+
     '<button class="btn btn-seal btn-lg" onclick="openGuide('+idx+')" style="margin-bottom:8px;">✍ 작성 가이드 열기</button>'+
-    '<button class="btn btn-lg" onclick="openChat('+idx+')" style="margin-bottom:8px;">이 공고에 대해 GPT에게 질문</button>'+
+    '<button class="btn btn-lg" onclick="openChat('+idx+')" style="margin-bottom:8px;">이 공고에 대해 AI 비서에게 질문</button>'+
     '<button class="btn btn-lg" onclick="toggleScrap('+idx+')">'+(scrapped?"★ 스크랩 해제":"☆ 스크랩하고 캘린더에 담기")+'</button></div>'+
     '<div class="panel"><h3>비슷한 공고</h3>'+
     (similar.length?similar.map(x=>'<div style="padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:13px;"><button style="background:none;border:none;padding:0;font-weight:600;text-align:left;line-height:1.45;color:inherit;cursor:pointer;" onclick="openDetail('+ANNS.indexOf(x)+')">'+esc(x.title)+'</button><div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px;">적합도 '+x.score+' · '+(x.dday===999?"상시":"D-"+x.dday)+'</div></div>').join(""):'<p class="mini-note">같은 분야의 다른 공고가 없습니다.</p>')+
@@ -926,6 +956,7 @@ function openDetail(idx){
   document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
   document.getElementById("view-detail").classList.add("active");
   currentView="detail"; closeDrawers(); window.scrollTo(0,0);
+  if(!fromPop) pushNav({v:"detail",idx:idx});
 }
 
 /* ══ 캘린더 ══ */
@@ -967,18 +998,34 @@ function fillProfileForm(){
   document.getElementById("p-target").value=ex.target||"";
   document.getElementById("p-certs").value=ex.certs||"";
   document.getElementById("p-needs").value=ex.needs||"";
+  document.getElementById("p-ceo").value=ex.ceo||"";
+  document.getElementById("p-corp").value=ex.corp||"";
+  document.getElementById("p-rev3y").value=ex.rev3y||"";
+  document.getElementById("p-staffmix").value=ex.staffmix||"";
+  document.getElementById("p-history").value=ex.history||"";
+  document.getElementById("p-invest").value=ex.invest||"";
   renderLearnedDoc();
 }
 function renderLearnedDoc(){
   const el=document.getElementById("learned-doc"); if(!el) return;
-  const d=PROFILE.extra&&PROFILE.extra.doc;
-  el.innerHTML = d ? '<div class="ai-result" style="margin:0 0 14px;">'+
-    '<span class="ai-badge">학습된 문서 · 저장됨'+(d.at?(' · '+esc(d.at)):'')+'</span>'+
+  const ex=PROFILE.extra||{};
+  const d=ex.learned||ex.doc;
+  const docs=ex.docs||[];
+  if(!d){ el.innerHTML=""; return; }
+  el.innerHTML='<div class="ai-result" style="margin:0 0 14px;">'+
+    '<span class="ai-badge">학습된 문서 '+(docs.length||1)+'건 · 종합 학습 내용</span>'+
+    (docs.length?('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">'+docs.map(function(x){return '<span class="doc-chip">📄 '+esc(x.name)+' <span style="color:var(--ink-faint);">'+esc(x.at||"")+'</span></span>';}).join("")+'</div>'):"")+
     '<h4>사업 요약</h4><p style="color:var(--ink-soft);line-height:1.7;">'+esc(d.summary||"")+'</p>'+
     '<h4>강점</h4><ul>'+((d.strengths||[]).map(function(s){return '<li>'+esc(s)+'</li>';}).join(""))+'</ul>'+
     '<h4>추천 지원 분야</h4><p style="color:var(--ink-soft);">'+((d.fields||[]).map(esc).join(" · "))+'</p>'+
     '<h4>보완 포인트</h4><ul>'+((d.improve||[]).map(function(s){return '<li>'+esc(s)+'</li>';}).join(""))+'</ul>'+
-    '<p class="mini-note">이 내용은 프로필에 저장되어 매칭과 GPT 답변에 계속 활용됩니다. 새 문서를 분석하면 갱신됩니다.</p></div>' : "";
+    '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;"><button class="btn" onclick="resetLearning()" style="font-size:12px;">학습 초기화</button><span class="mini-note" style="margin:0;">새 문서를 분석하면 기존 학습 내용과 자동으로 통합됩니다.</span></div></div>';
+}
+async function resetLearning(){
+  if(!confirm("학습된 문서 내용을 모두 지울까요? 프로필 기본 정보는 유지됩니다.")) return;
+  PROFILE.extra=PROFILE.extra||{};
+  delete PROFILE.extra.learned; delete PROFILE.extra.doc; PROFILE.extra.docs=[];
+  await saveProfileRemote(); renderLearnedDoc();
 }
 async function saveProfile(showMsg){
   PROFILE.company=document.getElementById("p-company").value.trim();
@@ -994,6 +1041,12 @@ async function saveProfile(showMsg){
   PROFILE.extra.target=document.getElementById("p-target").value.trim();
   PROFILE.extra.certs=document.getElementById("p-certs").value.trim();
   PROFILE.extra.needs=document.getElementById("p-needs").value.trim();
+  PROFILE.extra.ceo=document.getElementById("p-ceo").value.trim();
+  PROFILE.extra.corp=document.getElementById("p-corp").value;
+  PROFILE.extra.rev3y=document.getElementById("p-rev3y").value.trim();
+  PROFILE.extra.staffmix=document.getElementById("p-staffmix").value.trim();
+  PROFILE.extra.history=document.getElementById("p-history").value.trim();
+  PROFILE.extra.invest=document.getElementById("p-invest").value.trim();
   await saveProfileRemote(); rescoreAll();
   if(showMsg){ const m=document.getElementById("p-save-msg"); m.textContent = (sb&&userId)?"저장되었습니다 ✓":"저장됨 (체험 모드 — 새로고침 시 초기화)"; setTimeout(()=>m.textContent="",3000); }
 }
@@ -1003,7 +1056,7 @@ async function callClaude(messages,maxTokens){
   maxTokens=maxTokens||1000;
   let proxyReached=false;
   try{
-    const r=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages,max_tokens:maxTokens})});
+    const r=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages,max_tokens:maxTokens,model:(PROFILE.extra&&PROFILE.extra.model)||undefined})});
     proxyReached=true;
     const d=await r.json().catch(()=>null);
     if(r.ok&&d&&d.text!==undefined) return d.text;
@@ -1022,6 +1075,7 @@ async function callClaude(messages,maxTokens){
   return d.content.filter(b=>b.type==="text").map(b=>b.text).join("\n");
 }
 function errDetail(e){ const s=String(e&&e.message||""); return s.indexOf("SERVER::")===0 ? s.slice(8) : ""; }
+async function setModel(v){ if(!v) return; PROFILE.extra=PROFILE.extra||{}; PROFILE.extra.model=v; await saveProfileRemote(); }
 function profileContext(){
   const ex=PROFILE.extra||{};
   let s="[사용자 사업 프로필]\n회사: "+PROFILE.company+" / 업종: "+PROFILE.industry+" / 설립: "+PROFILE.founded+" / 소재지: "+PROFILE.region+" / 직원: "+PROFILE.staff+" / 작년 매출: "+PROFILE.revenue+"\n사업 소개: "+PROFILE.descr+"\n키워드: "+(PROFILE.keywords||[]).join(", ");
@@ -1029,9 +1083,17 @@ function profileContext(){
   if(ex.target) s+="\n타깃 고객: "+ex.target;
   if(ex.certs) s+="\n보유 인증·특허: "+ex.certs;
   if(ex.needs) s+="\n필요한 지원: "+ex.needs;
-  if(ex.doc&&ex.doc.summary){
-    s+="\n[학습된 사업계획서]\n요약: "+ex.doc.summary;
-    if(ex.doc.strengths&&ex.doc.strengths.length) s+="\n강점: "+ex.doc.strengths.join(", ");
+  if(ex.ceo) s+="\n대표자: "+ex.ceo;
+  if(ex.corp) s+="\n기업 형태: "+ex.corp;
+  if(ex.rev3y) s+="\n3개년 매출: "+ex.rev3y;
+  if(ex.staffmix) s+="\n직원 구성: "+ex.staffmix;
+  if(ex.history) s+="\n주요 연혁·성과: "+ex.history;
+  if(ex.invest) s+="\n투자 유치·수상: "+ex.invest;
+  const ld=ex.learned||ex.doc;
+  if(ld&&ld.summary){
+    s+="\n[학습된 문서 종합 내용"+((ex.docs&&ex.docs.length)?(" · "+ex.docs.length+"건"):"")+"]\n요약: "+ld.summary;
+    if(ld.strengths&&ld.strengths.length) s+="\n강점: "+ld.strengths.join(", ");
+    if(ld.improve&&ld.improve.length) s+="\n보완 필요: "+ld.improve.join(", ");
   }
   return s;
 }
@@ -1048,7 +1110,7 @@ function openGuide(idx){
   const body=document.getElementById("guide-body");
   if(guideCache[a.key]){ body.innerHTML=guideCache[a.key]+'<div id="draft-area"></div>'; }
   else{
-    body.innerHTML='<div class="guide-sec"><div class="sec-title" style="margin-top:0;">AI 맞춤 가이드</div><p>이 공고의 평가 포인트와 내 사업 기준 작성 전략을 GPT가 분석해 드립니다.</p><button class="btn btn-primary" id="gen-guide">가이드 생성하기</button></div><div id="guide-out"></div><div id="draft-area"></div>';
+    body.innerHTML='<div class="guide-sec"><div class="sec-title" style="margin-top:0;">AI 맞춤 가이드</div><p>이 공고의 평가 포인트와 내 사업 기준 작성 전략을 AI 비서가 분석해 드립니다.</p><button class="btn btn-primary" id="gen-guide">가이드 생성하기</button></div><div id="guide-out"></div><div id="draft-area"></div>';
     document.getElementById("gen-guide").onclick=async function(){
       this.disabled=true; this.innerHTML='<span class="spinner"></span> 분석 중…';
       try{
@@ -1061,20 +1123,41 @@ function openGuide(idx){
     };
   }
   const btn=document.getElementById("draft-btn");
-  btn.disabled=false; btn.textContent="GPT 초안 생성";
-  btn.onclick=async function(){
-    const area=document.getElementById("draft-area");
-    btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 초안 작성 중…';
-    try{
-      const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[지원사업 공고]\n"+a.title+"\n요약: "+a.summary+"\n\n위 회사가 이 공고에 지원한다고 가정하고 사업계획서 핵심 파트 초안을 작성해라. 형식: ## 섹션 헤더 3~4개, 각 3~5문장. 회사의 실제 정보를 활용하고, 심사위원이 확인하고 싶어할 정량 지표는 [예: 월 리드 40건]처럼 대괄호로 제안. 한국어 500자 내외."}],1400);
-      area.innerHTML='<div class="guide-sec"><div class="sec-title">GPT 생성 초안</div><div class="draft-out">'+mdLite(raw)+'</div><p class="mini-note">초안은 출발점입니다. 수치를 확인한 뒤 공고 양식에 맞춰 다듬으세요.</p></div>';
-      btn.textContent="다시 생성";
-    }catch(e){ area.innerHTML=claudeErrHtml(e); btn.textContent="GPT 초안 생성"; }
-    btn.disabled=false;
-  };
+  btn.disabled=false; btn.textContent="AI 초안 생성 (자동 검수)";
+  btn.onclick=function(){ genDraftAgent(a, btn); };
   document.getElementById("guide-drawer").classList.add("open");
   document.getElementById("chat-drawer").classList.remove("open");
   document.getElementById("overlay").classList.add("open");
+}
+
+/* ══ 초안 자동 검수 에이전트 (작성 → 심사 → 보완 반복, 목표 95점) ══ */
+async function genDraftAgent(a, btn){
+  const area=document.getElementById("draft-area");
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 작성 중…';
+  area.innerHTML='<div class="guide-sec"><div class="sec-title">AI 비서 작업 로그</div><div id="agent-log" style="font-size:12.5px;color:var(--ink-soft);line-height:2;"></div><div id="agent-out"></div></div>';
+  function log(t){ var el=document.getElementById("agent-log"); if(el){ el.innerHTML+=t+"<br>"; } }
+  const base=profileContext()+"\n\n[지원사업 공고]\n"+a.title+"\n주관: "+a.agency+"\n요약: "+a.summary+"\n마감: "+a.deadlineText;
+  try{
+    log("① 1차 초안 작성 중…");
+    let draft=await callClaude([{role:"user",content:base+"\n\n위 회사가 이 공고에 지원한다고 가정하고 사업계획서 핵심 파트 초안을 작성해라. 형식: ## 섹션 헤더 4개(문제인식 / 솔루션·차별성 / 시장·성장전략 / 자금 사용계획), 각 4~6문장. 프로필의 실제 수치·연혁·강점을 최대한 활용하고, 심사위원이 확인할 정량 지표는 [예: 월 신규고객 10개사]처럼 대괄호로 제안. 한국어 700자 내외."}],2000);
+    let score=0, iter=0, feedback="";
+    while(iter<3){
+      iter++;
+      log("② 심사위원 AI 검수 "+iter+"회차…");
+      const ev=await callClaude([{role:"user",content:"너는 정부지원사업 서면평가 심사위원이다. 공고 적합성, 구체성(수치·근거), 실현 가능성, 설득력을 냉정하게 평가해라. 반드시 JSON만 출력: {\"score\": 0~100 정수, \"feedback\": \"점수를 올리기 위해 반드시 고쳐야 할 3가지, 구체적으로\"}\n\n"+base+"\n\n[사업계획서 초안]\n"+draft}],700);
+      let pj={score:0,feedback:""};
+      try{ const mm=ev.replace(/```json|```/g,"").match(/\{[\s\S]*\}/); pj=JSON.parse(mm?mm[0]:ev); }catch(e){}
+      score=Math.round(Number(pj.score)||0); feedback=pj.feedback||"";
+      log("&nbsp;&nbsp;→ 검수 점수 <b>"+score+"점</b>"+(score>=95?" · 기준(95점) 통과 ✓":""));
+      if(score>=95) break;
+      if(iter>=3){ log("&nbsp;&nbsp;→ 검수 3회 완료 — 현재 최고본으로 마무리합니다"); break; }
+      log("③ 피드백을 반영해 보완 중…");
+      draft=await callClaude([{role:"user",content:base+"\n\n[기존 초안]\n"+draft+"\n\n[심사위원 피드백]\n"+(feedback||"전반적 완성도 개선")+"\n\n피드백을 모두 반영해 초안을 다시 작성해라. 형식(## 섹션 4개)은 동일하게 유지하고, 지적된 부분을 구체적 수치와 근거로 보강해라."}],2000);
+    }
+    document.getElementById("agent-out").innerHTML='<div class="sec-title" style="margin-top:16px;">최종 초안 · 검수 '+score+'점</div><div class="draft-out">'+mdLite(draft)+'</div><p class="mini-note">AI 심사위원의 자동 검수를 거친 초안입니다. 수치와 사실관계를 확인한 뒤 공고 양식에 맞춰 다듬으세요.</p>';
+    btn.textContent="다시 생성";
+  }catch(e){ area.innerHTML=claudeErrHtml(e); btn.textContent="AI 초안 생성 (자동 검수)"; }
+  btn.disabled=false;
 }
 
 /* ══ AI 채팅 ══ */
@@ -1126,10 +1209,12 @@ async function analyzeDoc(){
   if(uploadedFile&&uploadedFile.size>3500000){
     out.innerHTML='<div class="err-box"><b>PDF가 너무 큽니다 ('+(uploadedFile.size/1048576).toFixed(1)+'MB).</b><br>서버 전송 한도(약 4MB) 때문에 3.5MB 이하 파일만 분석할 수 있습니다.<br>해결 방법: ① PDF 압축 사이트(예: smallpdf)에서 용량 줄이기 ② 핵심 페이지만 추린 파일 사용 ③ 문서 내용을 복사해서 아래 붙여넣기 칸에 넣기</div>'; return;
   }
-  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> GPT가 문서를 읽는 중…';
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> AI 비서가 문서를 읽는 중…';
   out.innerHTML="";
   try{
-    const prompt='너는 정부지원사업 매칭 서비스의 분석 엔진이다. 아래 사업 문서를 읽고 반드시 JSON만 출력해라. 마크다운 코드펜스, 설명 문장 금지.\n스키마: {"summary":"2문장 사업 요약","strengths":["강점 3~4개"],"keywords":["#형태의 매칭 키워드 4~6개"],"fields":["추천 지원 분야 2~3개"],"improve":["사업계획서 보완 포인트 2~3개"]}';
+    const prevLearned=(PROFILE.extra&&(PROFILE.extra.learned||PROFILE.extra.doc))||null;
+    const prompt='너는 정부지원사업 매칭 서비스의 분석 엔진이다. 아래 사업 문서를 읽고 반드시 JSON만 출력해라. 마크다운 코드펜스, 설명 문장 금지.\n스키마: {"summary":"3~4문장 사업 요약","strengths":["강점 4~6개"],"keywords":["#형태의 매칭 키워드 4~8개"],"fields":["추천 지원 분야 2~3개"],"improve":["사업계획서 보완 포인트 2~4개"]}'
+      +(prevLearned?('\n\n[기존 학습 내용 — 이전 문서들의 종합]\n'+JSON.stringify(prevLearned)+'\n\n기존 학습 내용에 새 문서의 정보를 통합해 "갱신된 종합본" JSON을 출력해라. 여전히 유효한 기존 정보는 유지하고, 새 정보를 추가·보강해라.'):'');
     let content;
     if(uploadedFile&&uploadedFile.type==="application/pdf"){
       const b64=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result.split(",")[1]);r.onerror=()=>no(new Error("read"));r.readAsDataURL(uploadedFile);});
@@ -1146,9 +1231,16 @@ async function analyzeDoc(){
     (r.keywords||[]).forEach(k=>{const kk=k.startsWith("#")?k:"#"+k; if(!PROFILE.keywords.includes(kk)&&PROFILE.keywords.length<12)PROFILE.keywords.push(kk);});
     document.getElementById("p-kw").value=PROFILE.keywords.join(", ");
     PROFILE.extra=PROFILE.extra||{};
-    PROFILE.extra.doc={summary:r.summary||"",strengths:r.strengths||[],fields:r.fields||[],improve:r.improve||[],at:fmtDate(new Date())};
+    const docName=uploadedFile?uploadedFile.name:"붙여넣은 텍스트";
+    PROFILE.extra.docs=PROFILE.extra.docs||[];
+    PROFILE.extra.docs.push({name:docName, at:fmtDate(new Date())});
+    PROFILE.extra.learned={summary:r.summary||"",strengths:r.strengths||[],fields:r.fields||[],improve:r.improve||[],at:fmtDate(new Date())};
+    delete PROFILE.extra.doc;
     await saveProfileRemote(); rescoreAll(); renderLearnedDoc();
-    out.innerHTML='<div class="ai-result"><span class="ai-badge">GPT 분석 결과 — 프로필에 반영됨</span>'+
+    uploadedFile=null; document.getElementById("doc-file").value="";
+    document.getElementById("doc-paste").value="";
+    document.getElementById("dropzone").innerHTML='<b>파일 올리기 (PDF, TXT)</b>추가로 학습시킬 문서를 선택하세요';
+    out.innerHTML='<div class="ai-result"><span class="ai-badge">AI 비서 분석 결과 — 프로필에 반영됨</span>'+
       '<h4>사업 요약</h4><p style="color:var(--ink-soft);line-height:1.7;">'+esc(r.summary||"")+'</p>'+
       '<h4>강점</h4><ul>'+(r.strengths||[]).map(s=>'<li>'+esc(s)+'</li>').join("")+'</ul>'+
       '<h4>자동 추가된 매칭 키워드</h4><div class="kw" style="border:none;padding:0;margin:0;">'+(r.keywords||[]).map(k=>'<span class="kw-chip">'+esc(k)+'</span>').join("")+'</div>'+
@@ -1157,7 +1249,7 @@ async function analyzeDoc(){
   }catch(e){
     out.innerHTML = errDetail(e) ? claudeErrHtml(e) : '<div class="err-box"><b>분석에 실패했습니다.</b><br>AI 응답을 해석하지 못했습니다. 한 번 더 시도해 보시고, 반복되면 파일 대신 내용 붙여넣기로 시도해 주세요.</div>';
   }
-  btn.disabled=false; btn.textContent="GPT로 분석해서 학습하기";
+  btn.disabled=false; btn.textContent="AI 비서로 분석해서 학습하기";
 }
 
 /* ══ 드로어 공통 ══ */
