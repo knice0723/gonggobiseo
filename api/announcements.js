@@ -74,6 +74,7 @@ async function fetchSmes(key) {
     if (status && /마감|종료|완료/.test(status)) return null;
     const sDt = pickDateByPattern(it, /(str|bgn|begin|start).*(dt|de|dt)$/i) || pickDateByPattern(it, /^strDt$/i);
     const eDt = pickDateByPattern(it, /(end|fin|closs?).*(dt|de)$/i) || pickDateByPattern(it, /^endDt$/i);
+    if (eDt && eDt < yyyymmdd(new Date())) return null; // 접수 마감 지난 공고 제외
     let link = pick(it, ["dtlUrl", "detailUrl", "url", "link", "pblancUrl", "hmpgUrl"]);
     if (link && link.startsWith("/")) link = "https://www.smes.go.kr" + link;
     return {
@@ -129,15 +130,18 @@ async function fetchKstartup(key) {
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Cache-Control", "s-maxage=10800, stale-while-revalidate=600");
+  res.setHeader("Cache-Control", "s-maxage=1200, stale-while-revalidate=300");
 
   const smesKey = process.env.BIZINFO_API_KEY;
   const ksKey = process.env.KSTARTUP_API_KEY;
   if (!smesKey && !ksKey) return res.status(200).json({ source: "seed", reason: "no_key", items: [] });
 
   const fresh = req.url && req.url.indexOf("fresh=1") >= 0;
+  const lmm = req.url && req.url.match(/limit=(\d+)/);
+  const lim = lmm ? Math.max(10, Math.min(800, parseInt(lmm[1], 10))) : 0;
   if (!fresh && cache.payload && Date.now() - cache.at < 3 * 60 * 60 * 1000) {
-    return res.status(200).json(cache.payload);
+    const p = cache.payload;
+    return res.status(200).json(lim ? Object.assign({}, p, { items: p.items.slice(0, lim), limited: lim }) : p);
   }
 
   const results = await Promise.allSettled([
@@ -148,12 +152,15 @@ module.exports = async (req, res) => {
   const sm = smRes.items || [];
   const ks = results[1].status === "fulfilled" ? results[1].value : [];
 
-  const seen = new Set(); const items = [];
+  const map = new Map();
   for (const it of [...ks, ...sm]) {
     const norm = it.title.replace(/^\[[^\]]*\]\s*/, "").replace(/\s+/g, "").slice(0, 40);
-    if (seen.has(norm)) continue;
-    seen.add(norm); items.push(it);
+    if (map.has(norm)) { map.get(norm).dual = true; continue; }
+    map.set(norm, it);
   }
+  let items = [...map.values()];
+  items.sort((a, b) => String(b.registered).localeCompare(String(a.registered)));
+  if (items.length > 800) items = items.slice(0, 800);
 
   if (!items.length) {
     return res.status(200).json({ source: "seed", reason: "all_failed", smes24_note: smRes.note || "", items: [] });
@@ -169,5 +176,5 @@ module.exports = async (req, res) => {
     items
   };
   cache = { at: Date.now(), payload };
-  return res.status(200).json(payload);
+  return res.status(200).json(lim ? Object.assign({}, payload, { items: payload.items.slice(0, lim), limited: lim }) : payload);
 };
