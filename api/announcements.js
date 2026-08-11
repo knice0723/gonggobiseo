@@ -21,10 +21,12 @@ function ymd(s) { // "20260820" → "2026.08.20"
 /* ── 기업마당 ── */
 async function fetchBizinfo(key) {
   const url = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do?crtfcKey=" +
-    encodeURIComponent(key) + "&dataType=json&searchCnt=80";
+    (key.indexOf("%") >= 0 ? key : encodeURIComponent(key)) + "&dataType=json&searchCnt=80";
   const r = await fetch(url, { headers: { accept: "application/json" } });
   const raw = await r.text();
-  let json; try { json = JSON.parse(raw); } catch (e) { return []; }
+  let json;
+  try { json = JSON.parse(raw); }
+  catch (e) { return { items: [], note: "응답이 JSON이 아님(키 미활성/거부 가능성) · HTTP " + r.status + " · 응답 앞부분: " + raw.replace(/\s+/g, " ").slice(0, 120) }; }
   let list = null;
   if (Array.isArray(json)) list = json;
   else if (Array.isArray(json.jsonArray)) list = json.jsonArray;
@@ -32,8 +34,8 @@ async function fetchBizinfo(key) {
   else for (const k of Object.keys(json)) {
     if (Array.isArray(json[k]) && json[k].length && typeof json[k][0] === "object") { list = json[k]; break; }
   }
-  if (!list) return [];
-  return list.map((it) => {
+  if (!list) return { items: [], note: "응답에서 공고 배열을 찾지 못함: " + Object.keys(json).join(",").slice(0, 80) };
+  const items = list.map((it) => {
     const title = it.pblancNm || it.pblancnm || it.title || "";
     if (!title) return null;
     let link = it.pblancUrl || it.pblancurl || it.link || "";
@@ -49,6 +51,7 @@ async function fetchBizinfo(key) {
       url: link, source: "기업마당"
     };
   }).filter(Boolean);
+  return { items: items, note: items.length ? "" : "응답은 정상이나 공고 0건" };
 }
 
 /* ── K-Startup (공공데이터포털 15125364) ── */
@@ -100,15 +103,18 @@ module.exports = async (req, res) => {
   const ksKey = process.env.KSTARTUP_API_KEY;
   if (!bizKey && !ksKey) return res.status(200).json({ source: "seed", reason: "no_key", items: [] });
 
-  if (cache.payload && Date.now() - cache.at < 3 * 60 * 60 * 1000) {
+  const fresh = req.url && req.url.indexOf("fresh=1") >= 0;
+  if (!fresh && cache.payload && Date.now() - cache.at < 3 * 60 * 60 * 1000) {
     return res.status(200).json(cache.payload);
   }
 
   const results = await Promise.allSettled([
-    bizKey ? fetchBizinfo(bizKey) : Promise.resolve([]),
+    bizKey ? fetchBizinfo(bizKey) : Promise.resolve({ items: [], note: "키 없음" }),
     ksKey ? fetchKstartup(ksKey) : Promise.resolve([])
   ]);
-  const biz = results[0].status === "fulfilled" ? results[0].value : [];
+  const bizRes = results[0].status === "fulfilled" ? results[0].value : { items: [], note: "호출 실패: " + String(results[0].reason).slice(0, 100) };
+  const biz = bizRes.items || [];
+  const bizNote = bizRes.note || "";
   const ks = results[1].status === "fulfilled" ? results[1].value : [];
 
   // 제목 기준 중복 제거 (두 사이트에 같은 공고가 올라오는 경우)
@@ -121,7 +127,14 @@ module.exports = async (req, res) => {
 
   if (!items.length) return res.status(200).json({ source: "seed", reason: "all_failed", items: [] });
 
-  const payload = { source: (biz.length && ks.length) ? "bizinfo+kstartup" : (ks.length ? "kstartup" : "bizinfo"), count: items.length, items };
+  const payload = {
+    source: (biz.length && ks.length) ? "bizinfo+kstartup" : (ks.length ? "kstartup" : "bizinfo"),
+    count: items.length,
+    bizinfo_count: biz.length,
+    kstartup_count: ks.length,
+    bizinfo_note: bizNote,
+    items
+  };
   cache = { at: Date.now(), payload };
   return res.status(200).json(payload);
 };
