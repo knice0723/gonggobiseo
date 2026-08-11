@@ -36,7 +36,9 @@ module.exports = async (req, res) => {
       return { role: m.role, content: parts };
     });
 
-    const model = process.env.OPENAI_MODEL || "gpt-5.6-terra";
+    const ALLOWED = ["gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.6-luna"];
+    const reqModel = req.body && req.body.model;
+    const model = (reqModel && ALLOWED.indexOf(reqModel) >= 0) ? reqModel : (process.env.OPENAI_MODEL || "gpt-5.6-terra");
     const body = {
       model,
       max_completion_tokens: Math.min(max_tokens, 4000),
