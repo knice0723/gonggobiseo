@@ -97,32 +97,40 @@ async function fetchBizinfoGokr(key) {
 
 /* ── 과기부 R&D 사업공고 (apis.data.go.kr/1721000/msitannouncementinfo) ── */
 async function fetchMsit(key) {
-  // 공식 가이드(v1.0) 기준: businessAnnouncMentList / numOfRows=10 고정 / returnType=json / 응답: subject, viewUrl, deptName, managerName, managerTel, pressDt
+  // 공식 가이드: businessAnnouncMentList / numOfRows=10 고정 / returnType=json
+  // 데이터가 오래된 순으로 정렬된 경우를 대비해 totalCount 기준 마지막 페이지(최신)를 수집
   const base = "https://apis.data.go.kr/1721000/msitannouncementinfo/businessAnnouncMentList";
   const token = key.indexOf("%") >= 0 ? key : encodeURIComponent(key);
-  const pages = [1, 2, 3, 4, 5]; // 최신순 50건 수집
-  let note = "";
-  const results = await Promise.allSettled(pages.map((p) =>
-    fetch(base + "?serviceKey=" + token + "&numOfRows=10&pageNo=" + p + "&returnType=json", { headers: { accept: "application/json" } }).then((r) => r.text())
-  ));
-  const all = [];
-  for (const rr of results) {
-    if (rr.status !== "fulfilled") { note = "호출 실패: " + String(rr.reason).slice(0, 80); continue; }
-    let json;
-    try { json = JSON.parse(rr.value); }
-    catch (e) { note = "JSON 아님: " + String(rr.value).replace(/\s+/g, " ").slice(0, 120); continue; }
+  const call = async (p) => {
+    const r = await fetch(base + "?serviceKey=" + token + "&numOfRows=10&pageNo=" + p + "&returnType=json", { headers: { accept: "application/json" } });
+    const raw = await r.text();
+    let json; try { json = JSON.parse(raw); } catch (e) { return { err: "JSON 아님(HTTP " + r.status + "): " + raw.replace(/\s+/g, " ").slice(0, 100) }; }
     const hdr = json.response && json.response.header;
-    if (hdr && hdr.resultCode && hdr.resultCode !== "00") { note = "서버 코드 " + hdr.resultCode + ": " + (hdr.resultMsg || ""); continue; }
-    const list = findArray(json);
-    if (!list) { note = "응답: " + JSON.stringify(json).replace(/\s+/g, " ").slice(0, 140); continue; }
-    for (const it of list) all.push(it);
+    if (hdr && hdr.resultCode && hdr.resultCode !== "00") return { err: "서버 코드 " + hdr.resultCode + ": " + (hdr.resultMsg || "") };
+    const body = json.response && json.response.body;
+    return { list: findArray(json) || [], total: body ? parseInt(body.totalCount, 10) || 0 : 0 };
+  };
+  let note = "";
+  const first = await call(1);
+  if (first.err) return { items: [], note: first.err };
+  const all = (first.list || []).slice();
+  const total = first.total || 0;
+  const lastPage = Math.max(1, Math.ceil(total / 10));
+  const pages = [];
+  for (let p = lastPage; p > Math.max(1, lastPage - 5); p--) pages.push(p); // 마지막 5페이지(최신 후보)
+  const results = await Promise.allSettled(pages.map(call));
+  for (const rr of results) {
+    if (rr.status === "fulfilled" && rr.value.list) { for (const it of rr.value.list) all.push(it); }
+    else if (rr.status === "fulfilled" && rr.value.err) note = rr.value.err;
   }
-  const cutoff = yyyymmdd(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)); // 최근 90일 게시분만
+  const cutoff = yyyymmdd(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000));
+  let maxPress = "";
   const seenMs = new Set();
   const items = all.map((it) => {
     const title = stripHtml(it.subject || "");
     if (!title) return null;
     const press = String(it.pressDt || "").replace(/[^0-9]/g, "").slice(0, 8);
+    if (press > maxPress) maxPress = press;
     if (press && press < cutoff) return null;
     const url = it.viewUrl || "https://www.msit.go.kr";
     const k = "ms-" + String(url || title).slice(-80);
@@ -130,29 +138,31 @@ async function fetchMsit(key) {
     seenMs.add(k);
     const contact = [it.deptName, it.managerName, it.managerTel].map(stripHtml).filter(Boolean).join(" · ");
     return {
-      key: k,
-      title: title,
-      field: "기술·R&D",
+      key: k, title: title, field: "기술·R&D",
       agency: "과학기술정보통신부" + (it.deptName ? " " + stripHtml(it.deptName) : ""),
-      period: "",
-      registered: ymd(press),
+      period: "", registered: ymd(press),
       summary: (contact ? "담당: " + contact + " — " : "") + "접수기간·자격요건은 원문 공고를 확인하세요.",
-      url: url,
-      source: "과기부 R&D"
+      url: url, source: "과기부 R&D"
     };
-  }).filter(Boolean);
-  return { items: items, note: items.length ? "" : (note || "최근 90일 게시 공고 없음"), fields: "subject,viewUrl,deptName,managerName,managerTel,pressDt", path: "/businessAnnouncMentList" };
+  }).filter(Boolean).sort((a, b) => String(b.registered).localeCompare(String(a.registered))).slice(0, 60);
+  return {
+    items: items,
+    note: items.length ? "" : (note || ("수집 " + all.length + "건 중 최근 90일 게시분 없음 · 확인된 최신 게시일: " + (maxPress ? ymd(maxPress) : "없음") + " · totalCount: " + total)),
+    fields: "subject,viewUrl,deptName,managerName,managerTel,pressDt",
+    path: "/businessAnnouncMentList(p1+last5)"
+  };
 }
 
 /* ── 중소벤처24 공고정보 (portal.smes.go.kr/ione-gw/api/pblanc/list) ── */
 async function fetchSmes(key) {
   const today = new Date();
-  const past = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000); // 최근 30일 (응답 크기·타임아웃 완화)
   const token = key.indexOf("%") >= 0 ? key : encodeURIComponent(key);
-  const url = "https://portal.smes.go.kr/ione-gw/api/pblanc/list?token=" + token +
-    "&strDt=" + yyyymmdd(past) + "&endDt=" + yyyymmdd(today) + "&html=no";
+  const windows = [30, 7]; // 1차 30일, 실패 시 7일(가벼운 요청)로 재시도
   let json = null, lastNote = "";
-  for (let attempt = 1; attempt <= 2; attempt++) { // 그쪽 서버 504 대비 재시도
+  for (let attempt = 0; attempt < windows.length; attempt++) {
+    const past = new Date(today.getTime() - windows[attempt] * 24 * 60 * 60 * 1000);
+    const url = "https://portal.smes.go.kr/ione-gw/api/pblanc/list?token=" + token +
+      "&strDt=" + yyyymmdd(past) + "&endDt=" + yyyymmdd(today) + "&html=no";
     try {
       const r = await fetch(url, { headers: { accept: "application/json" } });
       const raw = await r.text();
@@ -160,7 +170,7 @@ async function fetchSmes(key) {
       catch (e) { lastNote = "응답이 JSON이 아님 · HTTP " + r.status + " · " + raw.replace(/\s+/g, " ").slice(0, 150); }
     } catch (e) { lastNote = "호출 실패: " + String(e && e.message ? e.message : e).slice(0, 100); }
   }
-  if (!json) return { items: [], note: lastNote + " (2회 시도)" };
+  if (!json) return { items: [], note: lastNote + " (30일→7일 2회 시도, 그쪽 서버 응답 없음)" };
 
   const list = findArray(json);
   if (!list) return { items: [], note: "중소벤처24 서버 응답: " + JSON.stringify(json).replace(/\s+/g, " ").slice(0, 200) };
