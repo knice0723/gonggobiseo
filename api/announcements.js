@@ -98,7 +98,7 @@ async function fetchBizinfoGokr(key) {
 /* ── 과기부 R&D 사업공고 (apis.data.go.kr/1721000/msitannouncementinfo) ── */
 async function fetchMsit(key) {
   const base = "https://apis.data.go.kr/1721000/msitannouncementinfo";
-  const paths = ["/getAnnouncementInfo", "/getMsitAnnouncementInfo", "/getAnnouncementList", "/announcementInfo", ""];
+  const paths = ["/businessAnnouncMentList", "/getAnnouncementInfo", "/getAnnouncementList", ""];
   const token = key.indexOf("%") >= 0 ? key : encodeURIComponent(key);
   let lastNote = "";
   for (const p of paths) {
@@ -139,15 +139,20 @@ async function fetchMsit(key) {
 /* ── 중소벤처24 공고정보 (portal.smes.go.kr/ione-gw/api/pblanc/list) ── */
 async function fetchSmes(key) {
   const today = new Date();
-  const past = new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000); // 최근 60일 등록 공고
+  const past = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000); // 최근 30일 (응답 크기·타임아웃 완화)
   const token = key.indexOf("%") >= 0 ? key : encodeURIComponent(key);
   const url = "https://portal.smes.go.kr/ione-gw/api/pblanc/list?token=" + token +
     "&strDt=" + yyyymmdd(past) + "&endDt=" + yyyymmdd(today) + "&html=no";
-  const r = await fetch(url, { headers: { accept: "application/json" } });
-  const raw = await r.text();
-  let json;
-  try { json = JSON.parse(raw); }
-  catch (e) { return { items: [], note: "응답이 JSON이 아님 · HTTP " + r.status + " · 응답 앞부분: " + raw.replace(/\s+/g, " ").slice(0, 150) }; }
+  let json = null, lastNote = "";
+  for (let attempt = 1; attempt <= 2; attempt++) { // 그쪽 서버 504 대비 재시도
+    try {
+      const r = await fetch(url, { headers: { accept: "application/json" } });
+      const raw = await r.text();
+      try { json = JSON.parse(raw); break; }
+      catch (e) { lastNote = "응답이 JSON이 아님 · HTTP " + r.status + " · " + raw.replace(/\s+/g, " ").slice(0, 150); }
+    } catch (e) { lastNote = "호출 실패: " + String(e && e.message ? e.message : e).slice(0, 100); }
+  }
+  if (!json) return { items: [], note: lastNote + " (2회 시도)" };
 
   const list = findArray(json);
   if (!list) return { items: [], note: "중소벤처24 서버 응답: " + JSON.stringify(json).replace(/\s+/g, " ").slice(0, 200) };
