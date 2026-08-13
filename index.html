@@ -394,7 +394,7 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     <div class="nav-label">설정</div>
     <button class="nav-item" data-nav="alerts" onclick="go('alerts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a2 2 0 003.4 0"/></svg>알림 설정</button>
     <button class="nav-item hidden" id="nav-admin" data-nav="admin" onclick="go('admin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3 1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9 1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>ADMIN</button>
-    <div class="sidebar-foot"><span id="side-src">공고 수집 대기 중</span><br><span style="font-size:11px;">공고 출처: 창업진흥원 K-Startup(공공데이터포털) · 중소벤처기업부 중소벤처24</span></div>
+    <div class="sidebar-foot"><span id="side-src">공고 수집 대기 중</span><br><span style="font-size:11px;">공고 출처: 창업진흥원 K-Startup · 중소벤처24 · 기업마당(공공데이터)</span></div>
   </aside>
 
   <main class="main">
@@ -446,7 +446,7 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     </div>
 
     <div id="view-search" class="view">
-      <div class="page-head"><h1>전체 공고 검색</h1><p id="search-desc">수집된 진행 중 공고를 검색합니다. 적합도는 내 프로필 기준으로 자동 계산됩니다.<br><span style="font-size:12px;color:var(--ink-faint);">출처: 창업진흥원 K-Startup(공공데이터포털), 중소벤처기업부 중소벤처24(공고정보 API)</span></p></div>
+      <div class="page-head"><h1>전체 공고 검색</h1><p id="search-desc">수집된 진행 중 공고를 검색합니다. 적합도는 내 프로필 기준으로 자동 계산됩니다.<br><span style="font-size:12px;color:var(--ink-faint);">출처: 창업진흥원 K-Startup, 중소벤처기업부 중소벤처24·기업마당 (공공데이터 Open API)</span></p></div>
       <div class="search-bar">
         <input id="q" type="search" placeholder="공고명, 키워드 검색 (예: 마케팅, R&D, 수출)" oninput="renderSearch()">
         <select id="f-cat" onchange="renderSearch()"><option value="">분야 전체</option></select>
@@ -768,12 +768,9 @@ async function loadAnnouncements(){
 }
 
 function srcLabel(){
-  if(annSource==="smes24+kstartup") return "K-Startup + 중소벤처24";
-  if(annSource==="smes24") return "중소벤처24(중소벤처기업부)";
-  if(annSource==="bizinfo+kstartup") return "K-Startup + 기업마당";
-  if(annSource==="kstartup") return "K-Startup(창업진흥원)";
-  if(annSource==="bizinfo") return "기업마당(중소벤처기업부)";
-  return "예시 데이터";
+  if(annSource==="seed"||annSource==="loading") return "예시 데이터";
+  const names={kstartup:"K-Startup",smes24:"중소벤처24",bizinfo:"기업마당",msit:"과기부 R&D"};
+  return String(annSource).split("+").map(function(s){return names[s]||s;}).join(" + ");
 }
 function bootDone(){ var b=document.getElementById("boot"); if(b) b.classList.add("hidden"); }
 let navInit=false;
@@ -920,7 +917,7 @@ function cardHtml(a){
   const idx=ANNS.indexOf(a);
   const scrapped=scraps[a.key]!==undefined;
   return '<article class="card">'+
-    '<div class="card-main"><div class="card-body"><div class="card-eyebrow"><span class="src">'+esc(a.source)+'</span><span class="dot"></span><span>'+esc(a.field)+'</span>'+(a.isNew?'<span class="badge-new">오늘 신규</span>':"")+(a.dual?'<span class="badge-dual">K-Startup·중소벤처24 동시 게재</span>':"")+'</div>'+
+    '<div class="card-main"><div class="card-body"><div class="card-eyebrow"><span class="src">'+esc(a.source)+'</span><span class="dot"></span><span>'+esc(a.field)+'</span>'+(a.isNew?'<span class="badge-new">오늘 신규</span>':"")+(a.dual?'<span class="badge-dual">복수 채널 동시 게재</span>':"")+'</div>'+
     '<h2 class="card-title"><button onclick="openDetail('+idx+')">'+esc(a.title)+'</button></h2>'+
     '<p class="card-summary">'+esc(a.summary||"요약 정보가 없습니다. 원문 공고를 확인하세요.")+'</p>'+
     '<p class="match-note">'+esc(a.note)+'</p></div>'+
@@ -1015,7 +1012,7 @@ function openDetail(idx, fromPop){
   document.getElementById("view-detail").innerHTML =
     '<button class="back-link" onclick="go(\'dashboard\')">← 목록으로</button>'+
     '<div class="detail-top"><div style="flex:1;">'+
-    '<div class="card-eyebrow"><span class="src">'+esc(a.source)+'</span><span class="dot"></span><span>'+esc(a.field)+'</span>'+(a.isNew?'<span class="badge-new">오늘 신규</span>':"")+(a.dual?'<span class="badge-dual">K-Startup·중소벤처24 동시 게재</span>':"")+'</div>'+
+    '<div class="card-eyebrow"><span class="src">'+esc(a.source)+'</span><span class="dot"></span><span>'+esc(a.field)+'</span>'+(a.isNew?'<span class="badge-new">오늘 신규</span>':"")+(a.dual?'<span class="badge-dual">복수 채널 동시 게재</span>':"")+'</div>'+
     '<h1 class="detail-title">'+esc(a.title)+'</h1></div>'+
     '<div class="stamp-col" style="grid-row:auto;">'+stampHtml(a)+ddayHtml(a)+'</div></div>'+
     '<div class="detail-grid"><div class="panel">'+
