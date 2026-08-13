@@ -417,7 +417,8 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
       </header>
       <div class="content-grid">
         <section>
-          <div class="tabs" id="dash-tabs">
+          <div id="profile-hint"></div>
+      <div class="tabs" id="dash-tabs">
             <button class="tab active" data-f="all">전체</button>
             <button class="tab" data-f="urgent">마감임박</button>
             <button class="tab" data-f="new">오늘 신규</button>
@@ -447,7 +448,7 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     </div>
 
     <div id="view-search" class="view">
-      <div class="page-head"><h1>전체 공고 검색</h1><p id="search-desc">수집된 진행 중 공고를 검색합니다. 적합도는 내 프로필 기준으로 자동 계산됩니다.<br><span style="font-size:12px;color:var(--ink-faint);">출처: 창업진흥원 K-Startup, 중소벤처기업부 중소벤처24·기업마당, 과학기술정보통신부 사업공고 (공공데이터 Open API)</span></p></div>
+      <div class="page-head" id="search-head"><h1>전체 공고 검색</h1><p id="search-desc">수집된 진행 중 공고를 검색합니다. 적합도는 내 프로필 기준으로 자동 계산됩니다.<br><span style="font-size:12px;color:var(--ink-faint);">출처: 창업진흥원 K-Startup, 중소벤처기업부 중소벤처24·기업마당, 과학기술정보통신부 사업공고 (공공데이터 Open API)</span></p></div>
       <div class="search-bar">
         <input id="q" type="search" placeholder="공고명, 키워드 검색 (예: 마케팅, R&D, 수출)" oninput="renderSearch()">
         <select id="f-cat" onchange="renderSearch()"><option value="">분야 전체</option></select>
@@ -710,34 +711,118 @@ function ddayOf(a){
 }
 
 /* ══ 적합도 계산 (규칙 기반 1차 스코어링) ══ */
+/* ══ 매칭 엔진 v2 — 프로필 정밀 대조 ══ */
+// 아무 공고에나 걸리는 일반어는 매칭 근거에서 제외
+const STOP=new Set(["지원","지원사업","사업","공고","모집","기업","중소기업","소기업","중소","기술","개발","서비스","솔루션","사업화","제품","시스템","플랫폼","기반","활용","구축","운영","관리","전문","혁신","성장","육성","참여","선정","신청","대상","공공","기관","정부","국내","해외","사업자","회사","주식회사","우리","최대","이내","년도","분야","관련","제공","통해","위한","및","등","교육","프로그램"]);
+function tokens(str,minLen){
+  return String(str||"").toLowerCase().split(/[^가-힣a-z0-9]+/).filter(function(w){
+    return w.length>=(minLen||2) && !STOP.has(w) && !/^[0-9]+$/.test(w);
+  });
+}
+// 업종 → 이 업종과 무관한 공고를 걸러내기 위한 배타 영역 사전
+const DOMAINS=[
+  {k:"소상공인·점포", re:/소상공인|전통시장|상점가|점포|자영업|골목상권|음식점|외식업|카페|숙박업|미용업|배달앱/, prof:/소상공인|음식|외식|카페|매장|점포|유통|리테일|프랜차이즈/},
+  {k:"농림축수산", re:/농업|농촌|축산|임업|수산|어업|양식|귀농|농식품|스마트팜|영농/, prof:/농업|축산|수산|농식품|스마트팜|식품/},
+  {k:"제조·공장", re:/스마트공장|뿌리기업|공정개선|제조현장|생산설비|금형|주조|용접|열처리|표면처리|소재부품장비/, prof:/제조|생산|공장|소재|부품|장비|하드웨어/},
+  {k:"건설·건축", re:/건설업|건축|시공|토목|플랜트|엔지니어링업체/, prof:/건설|건축|시공|토목/},
+  {k:"바이오·의료", re:/바이오|제약|의료기기|헬스케어|임상|신약|화장품|의약품/, prof:/바이오|제약|의료|헬스|화장품|진단/},
+  {k:"콘텐츠·문화", re:/콘텐츠|웹툰|게임|영상|공연|예술|관광|문화|출판|음악|애니메이션/, prof:/콘텐츠|게임|영상|미디어|음악|웹툰|관광|문화|엔터/},
+  {k:"수출·무역", re:/수출|해외진출|무역|바이어|전시회|해외마케팅|통상/, prof:/수출|해외|무역|글로벌|바이어/}
+];
 function scoreAnn(a){
-  const text = (a.title+" "+(a.summary||"")+" "+(a.field||"")).toLowerCase();
-  let s = 48; const reasons=[];
-  const words = new Set();
-  (PROFILE.keywords||[]).forEach(k=>String(k).replace(/^#/,"").split(/[·,\s/]+/).forEach(w=>{if(w.length>=2)words.add(w.toLowerCase());}));
-  String(PROFILE.industry||"").split(/[()\s·,/]+/).forEach(w=>{if(w.length>=2)words.add(w.toLowerCase());});
-  String(PROFILE.descr||"").split(/[\s,.()·/]+/).forEach(w=>{if(w.length>=3)words.add(w.toLowerCase());});
-  const _ex=PROFILE.extra||{};
-  String((_ex.products||"")+" "+(_ex.target||"")+" "+(_ex.needs||"")).split(/[\s,.()·/]+/).forEach(w=>{if(w.length>=2)words.add(w.toLowerCase());});
-  const hits=[...words].filter(w=>text.includes(w));
-  s += Math.min(hits.length*7, 28);
-  if(hits.length) reasons.push("프로필 키워드 일치: "+hits.slice(0,3).join(", "));
-  const reg = String(PROFILE.region||"").slice(0,2);
-  const m = a.title.match(/^\[([^\]]+)\]/);
+  const title=String(a.title||"");
+  const text=(title+" "+(a.summary||"")+" "+(a.field||"")).toLowerCase();
+  const ex=PROFILE.extra||{};
+  const reasons=[], warns=[];
+  let s=42;
+
+  /* 1) 프로필 용어 매칭 — 출처별 가중치 */
+  const strong=new Set(), mid=new Set(), weak=new Set();
+  (PROFILE.keywords||[]).forEach(function(k){ tokens(String(k).replace(/^#/,""),2).forEach(function(w){strong.add(w);}); });
+  tokens(PROFILE.industry,2).forEach(function(w){strong.add(w);});
+  tokens((ex.products||"")+" "+(ex.target||""),2).forEach(function(w){mid.add(w);});
+  tokens((ex.needs||"")+" "+(ex.certs||""),2).forEach(function(w){mid.add(w);});
+  tokens(PROFILE.descr,3).forEach(function(w){weak.add(w);});
+  const learned=ex.learned||ex.doc;
+  if(learned){ tokens((learned.summary||"")+" "+((learned.strengths||[]).join(" ")),3).forEach(function(w){weak.add(w);}); }
+
+  const hitS=[...strong].filter(function(w){return text.indexOf(w)>=0;});
+  const hitM=[...mid].filter(function(w){return !strong.has(w)&&text.indexOf(w)>=0;});
+  const hitW=[...weak].filter(function(w){return !strong.has(w)&&!mid.has(w)&&text.indexOf(w)>=0;});
+  s += Math.min(hitS.length*12,36) + Math.min(hitM.length*7,21) + Math.min(hitW.length*2,8);
+  // 제목에 핵심 키워드가 있으면 본문 언급보다 강한 신호
+  const titleLow=title.toLowerCase();
+  const titleHits=hitS.filter(function(w){return titleLow.indexOf(w)>=0;});
+  s += Math.min(titleHits.length*6,12);
+  const shown=hitS.concat(hitM).slice(0,3);
+  if(shown.length) reasons.push("사업 내용 일치: "+shown.join(", "));
+  const meaningful=hitS.length+hitM.length;
+
+  /* 2) 업종 영역 대조 — 우리 분야가 아닌 공고 배제 */
+  const profTxt=((PROFILE.industry||"")+" "+(PROFILE.descr||"")+" "+(ex.products||"")+" "+(ex.target||"")+" "+(ex.needs||"")+" "+(ex.certs||"")+" "+(PROFILE.keywords||[]).join(" ")+" "+((learned&&learned.summary)||"")).toLowerCase();
+  let domainHit=false;
+  DOMAINS.forEach(function(d){
+    if(!d.re.test(text)) return;
+    if(d.prof.test(profTxt)){ s+=14; domainHit=true; reasons.push(d.k+" 영역 부합"); }
+    else { s-=30; warns.push(d.k+" 대상 공고 — 우리 업종과 거리 있음"); }
+  });
+
+  /* 3) 지역 요건 */
+  const reg=String(PROFILE.region||"").slice(0,2);
+  const m=title.match(/^\[([^\]]+)\]/);
   if(m){
-    if(reg && m[1].includes(reg)){ s+=6; reasons.push("소재지("+reg+") 요건 일치"); }
-    else if(!/전국/.test(m[1])){ s-=24; reasons.push(m[1]+" 지역 한정 공고"); }
-  } else { s+=3; }
-  const needsTxt=(((PROFILE.extra&&PROFILE.extra.needs)||"")+" "+(PROFILE.keywords||[]).join(" ")).toLowerCase();
-  if(/교육|특강|아카데미|캠프|멘토링|세미나|설명회|교육생|수강|워크숍|부트캠프|경진대회|해커톤/.test(a.title) && !/교육|멘토링/.test(needsTxt)){ s-=18; reasons.push("교육·행사성 공고"); }
-  if(/자금|바우처|사업화|보조금|출연|융자|지원금|기술개발|r&d/i.test(a.title+" "+(a.summary||"")) && /자금|사업화|바우처|r&d|판로|마케팅|수출/.test(needsTxt)){ s+=8; reasons.push("필요 지원 유형 부합"); }
-  if(hits.length===0){ s=Math.min(s,58); }
-  const dd = ddayOf(a);
-  if(dd!==999 && dd<0) s = 10;
-  s = Math.max(10, Math.min(96, Math.round(s)));
-  let verdict = s>=80 ? "적합" : (s>=60 ? "검토" : "낮음");
-  let note = reasons.length ? reasons.join(" · ") : "프로필과의 접점이 뚜렷하지 않습니다. 원문에서 자격 요건을 확인하세요.";
-  return { score:s, verdict, note };
+    if(reg&&m[1].indexOf(reg)>=0){ s+=7; reasons.push("소재지("+reg+") 요건 충족"); }
+    else if(!/전국/.test(m[1])){ s-=34; warns.push(m[1]+" 지역 기업만 신청 가능"); }
+  }
+
+  /* 4) 업력·기업형태 자격 */
+  const fy=parseInt(String(PROFILE.founded||"").replace(/[^0-9]/g,"").slice(0,4),10);
+  const age=fy?(new Date().getFullYear()-fy):null;
+  const corp=String(ex.corp||"");
+  if(age!==null){
+    const lim=text.match(/(창업\s*)?(\d)\s*년\s*(이내|미만)/);
+    if(lim){
+      const need=parseInt(lim[2],10);
+      if(age<=need){ s+=10; reasons.push("업력 "+age+"년 — "+need+"년 이내 요건 충족"); }
+      else { s-=32; warns.push("업력 "+need+"년 이내 대상 (현재 "+age+"년)"); }
+    }
+    if(/예비\s*창업|창업\s*예정/.test(text)&&age>0&&corp!=="예비창업자"){ s-=30; warns.push("예비창업자 대상 공고"); }
+    if(age>=7&&/초기창업|창업초기|초기\s*스타트업/.test(text)){ s-=14; warns.push("초기창업 단계 대상"); }
+  }
+  if(corp==="개인사업자"&&/법인\s*(기업|사업자)만|법인에\s*한함/.test(text)){ s-=26; warns.push("법인 대상 공고"); }
+
+  /* 5) 필요 지원 유형 부합 */
+  const needTxt=((ex.needs||"")+" "+(PROFILE.keywords||[]).join(" ")).toLowerCase();
+  const TYPES=[
+    {re:/자금|융자|보조금|출연금|사업화\s*자금/, need:/자금|사업화|운영자금|보조금/, label:"자금 지원"},
+    {re:/바우처/, need:/바우처|컨설팅|마케팅|디자인/, label:"바우처"},
+    {re:/r&d|기술개발|연구개발|과제/i, need:/r&d|기술개발|연구|과제/, label:"R&D"},
+    {re:/판로|마케팅|홍보|전시|박람회/, need:/판로|마케팅|홍보|영업|고객/, label:"판로·마케팅"},
+    {re:/수출|해외진출|글로벌/, need:/수출|해외|글로벌/, label:"수출"},
+    {re:/인력|채용|고용|인건비/, need:/인력|채용|고용|인건비/, label:"인력·고용"},
+    {re:/투자|ir|벤처투자/i, need:/투자|ir|시리즈/, label:"투자유치"}
+  ];
+  TYPES.forEach(function(t){ if(t.re.test(text)&&t.need.test(needTxt)){ s+=14; reasons.push("필요 지원("+t.label+") 부합"); } });
+
+  /* 6) 실속 없는 유형 감점 */
+  if(/교육|특강|아카데미|캠프|세미나|설명회|수강생|교육생|워크숍|부트캠프|경진대회|해커톤|공모전|박람회\s*참관/.test(title)){
+    if(/교육|멘토링|인력양성/.test(needTxt)){ s-=6; }
+    else { s-=26; warns.push("교육·행사성 공고 (자금 지원 아님)"); }
+  }
+  if(/모집\s*공고\s*$/.test(title)&&/참여기업|수요기업/.test(title)&&meaningful===0) s-=8;
+
+  /* 7) 근거 없는 추천 차단 */
+  if(meaningful===0&&!domainHit) s=Math.min(s,48);
+  if(meaningful===0&&hitW.length===0) s=Math.min(s,40);
+
+  const dd=ddayOf(a);
+  if(dd!==999&&dd<0) s=10;
+  s=Math.max(8,Math.min(96,Math.round(s)));
+  const verdict = s>=78?"적합":(s>=58?"검토":"낮음");
+  let note;
+  if(warns.length) note=(reasons.length?reasons.slice(0,2).join(" · ")+" / ":"")+"⚠ "+warns.slice(0,2).join(" · ");
+  else note=reasons.length?reasons.slice(0,3).join(" · "):"프로필과의 접점이 뚜렷하지 않습니다. 원문에서 자격 요건을 확인하세요.";
+  return { score:s, verdict:verdict, note:note };
 }
 
 /* ══ 공고 데이터 로드 ══ */
@@ -925,7 +1010,12 @@ function ddayHtml(a){
   return '<span class="dday '+(a.dday<=7?"urgent":"")+'">D-'+a.dday+'</span>';
 }
 let dashFilter="all";
-function matchedList(){ const m=ANNS.filter(a=>a.score>=70); return m.length?m:ANNS.slice(0,4); }
+function matchedList(){
+  const hi=ANNS.filter(function(a){return a.score>=70;});
+  if(hi.length) return hi;
+  const mid=ANNS.filter(function(a){return a.score>=58;});
+  return mid.slice(0,5);
+}
 function renderDash(){
   rescoreAll(); applyAiCache();
   const matched=matchedList();
@@ -937,6 +1027,7 @@ function renderDash(){
   document.getElementById("brief-title").innerHTML =
     annSource==="loading" ? "공고를 수집하고 있습니다…" :
     '수집된 공고 <span class="hl">'+ANNS.length+'건</span> 중<br>'+esc(greet())+' 사업에 맞는 <span class="hl">'+matched.length+'건</span>을 찾았습니다.';
+  renderProfileHint();
   document.getElementById("brief-sub").textContent =
     annSource==="seed" ? "예시 공고입니다. API 키를 연결하면 실제 공고로 바뀝니다." :
     "출처: "+srcLabel()+((annSource.indexOf("bizinfo")<0&&annSource.indexOf("smes24")<0)?" · 중소벤처24(중소벤처기업부)는 연동 예정":"")+" · 매일 자동 갱신";
@@ -1622,7 +1713,7 @@ function applyAiCache(){
   let touched=false;
   ANNS.forEach(function(a){
     const v=c.map[a.key];
-    if(v){ a.score=v.s; a.verdict=a.score>=80?"적합":(a.score>=60?"검토":"낮음"); a.note="AI 요건 검증: "+v.n; touched=true; }
+    if(v){ a.score=v.s; a.verdict=a.score>=78?"적합":(a.score>=58?"검토":"낮음"); a.note="AI 검증: "+v.n; touched=true; }
   });
   if(touched) ANNS.sort(function(x,y){return y.score-x.score;});
 }
@@ -1634,9 +1725,9 @@ async function aiRerank(){
   if(!PROFILE.company) return;
   aiRerankRunning=true;
   try{
-    const cand=ANNS.slice(0,25);
+    const cand=ANNS.slice(0,30);
     const listTxt=cand.map(function(a,i){return i+". ["+a.field+"] "+a.title+(a.summary?" — "+a.summary.slice(0,80):"");}).join("\n");
-    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[후보 공고 25건]\n"+listTxt+"\n\n각 공고가 위 회사에 실제로 유용한지 냉정하게 평가해라. 기준: ① 지원내용(자금·바우처·판로·R&D 등)이 회사의 필요와 실제로 맞는가 ② 업종·업력·규모·지역 등 자격요건 충족 가능성 ③ 단순 교육·행사·설명회·경진대회는 60점 이하 ④ 소재지가 같다는 이유만으로는 높은 점수를 주지 말 것. JSON만 출력: {\"scores\":[{\"i\":0,\"s\":85,\"n\":\"20자 이내 사유\"}, ...]} — 25개 전 항목 포함."}],1900);
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[후보 공고 25건]\n"+listTxt+"\n\n너는 이 회사의 정부지원사업 담당 컨설턴트다. 각 공고를 '이 회사가 실제로 신청해서 선정될 수 있고, 선정되면 도움이 되는가' 기준으로 냉정하게 채점해라.\n\n채점 원칙(엄격히 적용):\n1. 자격 미달이면 30점 이하 — 업력 제한, 지역 제한, 예비창업자 대상, 업종 한정(소상공인/농업/제조/건설 등 우리 업종이 아닌 것)\n2. 우리 업종·제품과 무관한 분야의 공고는 40점 이하. 회사 사업 내용과의 실질적 연결이 없으면 높은 점수 금지\n3. 단순 교육·설명회·세미나·경진대회·참관은 55점 이하 (자금 지원이 아님)\n4. 소재지가 같다는 이유만으로 점수를 올리지 말 것. 지역은 자격 조건일 뿐 적합성 근거가 아니다\n5. 80점 이상은 '자격 충족 + 사업 내용 직접 연관 + 필요한 지원 유형 일치' 3개가 모두 맞을 때만\n6. 애매하면 낮게 준다. 잘못된 추천이 누락보다 나쁘다\n\nJSON만 출력: {\"scores\":[{\"i\":0,\"s\":85,\"n\":\"25자 이내 사유(적합/부적합 근거 구체적으로)\"}, ...]} — 30개 전 항목 포함."}],1900);
     const mm=raw.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
     const pj=JSON.parse(mm?mm[0]:raw);
     const map={};
@@ -1652,6 +1743,18 @@ async function aiRerank(){
     if(currentView==="calendar")renderCal();
   }catch(e){}
   aiRerankRunning=false;
+}
+
+function renderProfileHint(){
+  const el=document.getElementById("profile-hint"); if(!el) return;
+  const ex=PROFILE.extra||{};
+  const miss=[];
+  if(!(PROFILE.keywords||[]).length) miss.push("매칭 키워드");
+  if(!ex.products) miss.push("주요 제품·서비스");
+  if(!ex.needs) miss.push("필요한 지원");
+  if(!(ex.learned||ex.doc)) miss.push("사업계획서 학습");
+  if(!miss.length){ el.innerHTML=""; return; }
+  el.innerHTML='<div class="ai-result" style="margin:0 0 14px;padding:12px 14px;"><b style="font-size:13px;">매칭 정확도를 높이려면</b><p style="font-size:12.5px;color:var(--ink-soft);margin-top:5px;line-height:1.6;">'+miss.map(esc).join(" · ")+' 항목이 비어 있습니다. 채우면 AI가 우리 회사에 실제로 맞는 공고만 골라냅니다.</p><button class="btn" style="margin-top:9px;font-size:12px;" onclick="go(\'profile\')">프로필 보강하기 →</button></div>';
 }
 
 /* ══ 학습 내용 → 프로필 자동 반영 ══ */
