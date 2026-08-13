@@ -1445,6 +1445,19 @@ async function callClaude(messages,maxTokens){
   const d=await r.json();
   return d.content.filter(b=>b.type==="text").map(b=>b.text).join("\n");
 }
+function parseJson(raw){
+  let t=String(raw||"").replace(/```json|```/g,"").trim();
+  const i=t.indexOf("{"), j=t.lastIndexOf("}");
+  if(i>=0&&j>i) t=t.slice(i,j+1);
+  else if(i>=0){ t=t.slice(i); const need=(t.match(/\{/g)||[]).length-(t.match(/\}/g)||[]).length; t=t.replace(/,\s*$/,"")+"]".repeat(Math.max(0,(t.match(/\[/g)||[]).length-(t.match(/\]/g)||[]).length))+"}".repeat(Math.max(0,need)); }
+  try{ return JSON.parse(t); }catch(e){}
+  try{ return JSON.parse(t.replace(/,(\s*[}\]])/g,"$1")); }catch(e){}
+  const items=[];
+  const re=/\{[^{}]*\}/g; let m;
+  while((m=re.exec(t))!==null){ try{ items.push(JSON.parse(m[0])); }catch(e){} }
+  if(items.length) return {items:items,qs:items,scores:items,tasks:items,sections:items};
+  throw new Error("PARSE_FAIL");
+}
 function errDetail(e){ const s=String(e&&e.message||""); return s.indexOf("SERVER::")===0 ? s.slice(8) : ""; }
 async function setModel(v){ if(!v) return; PROFILE.extra=PROFILE.extra||{}; PROFILE.extra.model=v; await saveProfileRemote(); }
 async function bumpLogin(){
@@ -1795,8 +1808,7 @@ async function genAdminPlan(){
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 수행 절차 정리 중…';
   try{
     const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[선정된 지원사업]\n"+a.title+"\n주관: "+a.agency+"\n수행기관: "+(d.agency||"미정")+"\n협약기간: "+(d.period||"미정")+"\n지원금: "+(d.fund||"미정")+"\n\n너는 정부지원사업 수행 관리 전문가다. 이 사업에 선정된 기업이 협약부터 정산·최종보고까지 반드시 처리해야 할 행정 업무를 시간순으로 정리해라. 한국 정부지원사업의 실제 절차(협약체결, 사업비 카드 발급, 집행 증빙, 중간보고, 변경신청, 최종보고, 정산, 기술료 등) 기준으로.\n반드시 JSON만 출력: {\"tasks\":[{\"phase\":\"협약|집행|보고|정산\",\"name\":\"업무명(구체적으로)\",\"due\":\"YYYY.MM.DD 또는 빈문자열\",\"docs\":\"필요 서류\",\"done\":false} 10~16개],\"tips\":\"실수하기 쉬운 정산 주의사항 2~3가지\"}"}],1800);
-    const mm=raw.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
-    const j=JSON.parse(mm?mm[0]:raw);
+    const j=parseJson(raw);
     d.admin={tasks:(j.tasks||[]).slice(0,18),tips:j.tips||"",at:fmtDate(new Date())};
     await saveApply(false);
     renderApplyPage();
@@ -1997,8 +2009,7 @@ async function aiRerank(){
     const cand=ANNS.slice(0,30);
     const listTxt=cand.map(function(a,i){return i+". ["+a.field+"] "+a.title+(a.summary?" — "+a.summary.slice(0,80):"");}).join("\n");
     const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[후보 공고 25건]\n"+listTxt+"\n\n너는 이 회사의 정부지원사업 담당 컨설턴트다. 각 공고를 '이 회사가 실제로 신청해서 선정될 수 있고, 선정되면 도움이 되는가' 기준으로 냉정하게 채점해라.\n\n채점 원칙(엄격히 적용):\n1. 자격 미달이면 30점 이하 — 업력 제한, 지역 제한, 예비창업자 대상, 업종 한정(소상공인/농업/제조/건설 등 우리 업종이 아닌 것)\n2. 우리 업종·제품과 무관한 분야의 공고는 40점 이하. 회사 사업 내용과의 실질적 연결이 없으면 높은 점수 금지\n3. 단순 교육·설명회·세미나·경진대회·참관은 55점 이하 (자금 지원이 아님)\n4. 소재지가 같다는 이유만으로 점수를 올리지 말 것. 지역은 자격 조건일 뿐 적합성 근거가 아니다\n5. 80점 이상은 '자격 충족 + 사업 내용 직접 연관 + 필요한 지원 유형 일치' 3개가 모두 맞을 때만\n6. 애매하면 낮게 준다. 잘못된 추천이 누락보다 나쁘다\n\nJSON만 출력: {\"scores\":[{\"i\":0,\"s\":85,\"n\":\"25자 이내 사유(적합/부적합 근거 구체적으로)\"}, ...]} — 30개 전 항목 포함."}],1900);
-    const mm=raw.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
-    const pj=JSON.parse(mm?mm[0]:raw);
+    const pj=parseJson(raw);
     const map={};
     (pj.scores||[]).forEach(function(o){
       const a=cand[o.i]; if(!a) return;
@@ -2149,17 +2160,22 @@ function certGuideCustom(i){
 async function discoverCerts(){
   const btn=document.getElementById("cert-discover-btn");
   if(!PROFILE.company){ alert("먼저 사업 프로필을 등록해 주세요."); return; }
-  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 프로필 기반으로 숨은 제도 발굴 중…';
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 숨은 제도 발굴 중…';
   try{
-    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n너는 한국 중소기업 정책 전문 컨설턴트다. 위 회사가 실제로 활용할 수 있는데 일반 대표들이 잘 모르는 정부 제도·인증·세제혜택·바우처·특례를 발굴해라. 이 회사의 업종·업력·규모에 실제로 해당되는 것만. 다음 목록에 이미 있는 것은 제외해라: "+CERTS.join(", ")+"\n반드시 JSON만 출력: {\"items\":[{\"name\":\"제도의 공식 명칭\",\"why\":\"이 회사에 유용한 이유 25자 이내\"} — 8~12개]}"}],1400);
-    const mm=raw.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
-    const pj=JSON.parse(mm?mm[0]:raw);
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n너는 한국 중소기업 정책 전문 컨설턴트다. 위 회사가 활용 가능한데 대표들이 잘 모르는 제도·인증·세제혜택·바우처·특례를 발굴해라. 업종·업력·규모에 실제 해당하는 것만. 벤처기업확인, 기업부설연구소, 이노비즈, 메인비즈, 기술보증기금, GS인증, ISO, TIPS, 수출바우처처럼 널리 알려진 것은 제외.\n\n간결하게, 반드시 JSON만 출력(다른 말 금지):\n{\"items\":[{\"name\":\"제도 공식명칭\",\"why\":\"유용한 이유 20자 이내\"}]}\n8개."}],1200);
+    const pj=parseJson(raw);
+    const items=(pj.items||[]).filter(function(x){return x&&x.name;}).slice(0,12);
+    if(!items.length) throw new Error("EMPTY");
     PROFILE.extra=PROFILE.extra||{};
-    PROFILE.extra.customCerts=(pj.items||[]).filter(function(x){return x&&x.name;}).slice(0,12);
+    PROFILE.extra.customCerts=items;
     await saveProfileRemote();
     renderCertChips();
-    btn.textContent="🔎 다시 발굴 (프로필 변경 후 유용)";
-  }catch(e){ alert("발굴에 실패했습니다. 잠시 후 다시 시도해 주세요."); btn.textContent="🔎 우리 회사 맞춤 숨은 제도 AI 발굴"; }
+    btn.textContent="🔎 다시 발굴";
+  }catch(e){
+    const d=errDetail(e);
+    alert("발굴에 실패했습니다."+(d?("\n\n서버 응답: "+d.slice(0,150)):"\n\n잠시 후 다시 시도하거나, 알림 설정에서 다른 AI 모델로 바꿔보세요."));
+    btn.textContent="🔎 우리 회사 맞춤 숨은 제도 AI 발굴";
+  }
   btn.disabled=false;
 }
 function showRoadmap(){
@@ -2261,8 +2277,7 @@ async function deepAnalyze(idx){
     }catch(e){}
     btn.innerHTML='<span class="spinner"></span> ② AI가 공고문을 학습·분석 중…';
     const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[분석 대상 공고]\n제목: "+a.title+"\n출처: "+a.source+" · 마감: "+a.deadlineText+"\n요약: "+a.summary+(doc?("\n\n[공고 원문 전문]\n"+doc.slice(0,9500)):"\n\n(원문 페이지 접근 불가 — 제목·요약 기준으로 분석하되 확실하지 않은 항목은 확인필요로 표시)")+"\n\n위 공고를 이 회사 기준으로 정밀 분석해라. 반드시 JSON만 출력:\n{\"score\":0~100 정수(이 회사의 실제 신청 적합도 — 자격 미달이면 30 이하, 업종 무관 40 이하),\"oneline\":\"20자 이내 한줄 판정\",\"explain\":\"공고를 쉬운 말로 4~5문장 풀이\",\"support\":\"지원 내용·금액·기간\",\"target\":\"신청 자격 요지\",\"check\":[{\"item\":\"요건명\",\"ok\":\"충족|미충족|확인필요\",\"why\":\"15자 근거\"} 4~6개 — 원문에 명시된 요건 위주],\"docs\":[\"제출 서류들\"],\"schedule\":\"접수·평가·발표 일정\",\"strategy\":\"이 회사의 작성·준비 전략 3문장\"}"}],1800);
-    const mm=raw.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
-    const pj=JSON.parse(mm?mm[0]:raw);
+    const pj=parseJson(raw);
     applyDeepScore(a,pj);
     PROFILE.extra=PROFILE.extra||{};
     PROFILE.extra.deepCache=PROFILE.extra.deepCache||{};
@@ -2279,6 +2294,7 @@ async function deepAnalyze(idx){
 
 /* ════════ 기업 데이터뱅크 ════════ */
 const BANK_FIELDS=[
+ {k:"overview", n:"회사 개요·연혁", ph:"설립 배경, 주요 연혁(연월별), 조직 구성"},
  {k:"problem", n:"해결하려는 문제·시장 배경", ph:"고객이 겪는 문제와 그 규모. 예: 국내 중소기업 78%가 랜섬웨어 복구에 평균 5일 소요"},
  {k:"solution", n:"제품·기술의 핵심 원리", ph:"어떻게 해결하는지. 기술 방식, 구조, 특허 요소"},
  {k:"diff", n:"경쟁사 대비 차별점", ph:"경쟁사명과 우리가 나은 점(수치로)"},
@@ -2290,7 +2306,15 @@ const BANK_FIELDS=[
  {k:"plan", n:"향후 개발·사업화 계획", ph:"단계별 개발 일정, 목표 지표"},
  {k:"fund", n:"자금 사용 계획", ph:"인건비/재료비/외주비 등 항목별 배분 방향"},
  {k:"risk", n:"리스크와 대응", ph:"기술·시장·자금 리스크와 대응 방안"},
- {k:"social", n:"고용·사회적 성과", ph:"현재 고용 인원, 채용 계획, 지역 기여"}
+ {k:"social", n:"고용·사회적 성과", ph:"현재 고용 인원, 채용 계획, 지역 기여"},
+ {k:"customer", n:"고객사·레퍼런스", ph:"주요 고객사명, 도입 사례, 성과 수치"},
+ {k:"rnd", n:"R&D 수행 이력", ph:"수행한 국책과제·자체 R&D의 과제명·기간·예산·성과"},
+ {k:"prod", n:"생산·공급 역량", ph:"개발·생산 인프라, 협력사, 품질관리 체계"},
+ {k:"global", n:"해외 진출 현황·계획", ph:"수출 실적, 해외 파트너, 목표 국가와 전략"},
+ {k:"finance", n:"재무 현황·자금 조달", ph:"자본금, 부채비율, 투자 유치 이력, 조달 계획"},
+ {k:"esg", n:"ESG·인증 현황", ph:"보유 인증, 환경·안전 관리, 지배구조"},
+ {k:"award", n:"수상·언론 보도", ph:"수상 내역(주최·연도), 언론 보도, 전시 참가"},
+ {k:"ip", n:"지식재산 상세", ph:"특허·상표의 명칭, 출원/등록번호, 권리자"}
 ];
 function bank(){ PROFILE.extra=PROFILE.extra||{}; PROFILE.extra.bank=PROFILE.extra.bank||{}; return PROFILE.extra.bank; }
 function bankFilled(){ const b=bank(); return BANK_FIELDS.filter(function(f){return (b[f.k]||"").trim().length>=20;}).length; }
@@ -2302,13 +2326,17 @@ function renderBank(){
   document.getElementById("bank-hint").textContent = pct>=80 ? "충분합니다. 사업계획서 작성 시 대부분의 항목이 자동으로 채워집니다."
     : pct>=40 ? "절반 정도 채워졌습니다. 빈 항목은 작성 중 [입력 필요]로 표시됩니다."
     : "비어 있는 항목이 많습니다. 자동 채우기나 AI 인터뷰로 빠르게 채워보세요.";
+  setTimeout(renderBankFiles,0);
   document.getElementById("bank-list").innerHTML=BANK_FIELDS.map(function(f){
     const v=(b[f.k]||""), ok=v.trim().length>=20;
     return '<div style="padding:12px 0;border-bottom:1px solid var(--line-soft);">'+
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;">'+
       '<span style="flex:1;font-size:13.5px;font-weight:700;">'+esc(f.n)+'</span>'+
       '<span class="st '+(ok?"st-fill":"st-empty")+'">'+(ok?"작성됨":"비어 있음")+'</span></div>'+
-      '<textarea id="bk-'+f.k+'" rows="2" placeholder="'+esc(f.ph)+'" onchange="bankSave()" style="width:100%;font-size:13px;line-height:1.7;">'+esc(v)+'</textarea></div>';
+      '<textarea id="bk-'+f.k+'" rows="3" placeholder="'+esc(f.ph)+'" onchange="bankSave()" style="width:100%;font-size:13px;line-height:1.7;">'+esc(v)+'</textarea>'+
+      '<div id="bkf-'+f.k+'" style="margin-top:6px;"></div>'+
+      (sb&&userId?'<input type="file" id="bkfile-'+f.k+'" class="hidden" multiple onchange="bankUpload(\''+f.k+'\',this)"><button class="btn" style="font-size:11.5px;padding:4px 10px;margin-top:5px;" onclick="document.getElementById(\'bkfile-'+f.k+'\').click()">+ 근거 자료 첨부</button>':'')+
+      '</div>';
   }).join("");
 }
 async function bankSave(){
@@ -2316,6 +2344,49 @@ async function bankSave(){
   BANK_FIELDS.forEach(function(f){ const el=document.getElementById("bk-"+f.k); if(el) b[f.k]=el.value.trim(); });
   await saveProfileRemote();
   renderBank();
+}
+function bankFiles(){ PROFILE.extra=PROFILE.extra||{}; PROFILE.extra.bankFiles=PROFILE.extra.bankFiles||{}; return PROFILE.extra.bankFiles; }
+function renderBankFiles(){
+  const bf=bankFiles();
+  BANK_FIELDS.forEach(function(f){
+    const el=document.getElementById("bkf-"+f.k); if(!el) return;
+    const arr=bf[f.k]||[];
+    el.innerHTML=arr.map(function(x,i){
+      return '<span class="doc-chip" style="margin:3px 4px 0 0;">📎 '+esc(x.name.slice(0,26))+
+        ' <button style="background:none;border:none;color:var(--navy);font-size:11px;font-weight:700;cursor:pointer;" onclick="bankOpen(\''+f.k+'\','+i+')">열기</button>'+
+        ' <button style="background:none;border:none;color:var(--seal);font-size:11px;font-weight:700;cursor:pointer;" onclick="bankDelFile(\''+f.k+'\','+i+')">×</button></span>';
+    }).join("");
+  });
+}
+async function bankUpload(k,input){
+  const files=Array.prototype.slice.call(input.files||[]); input.value="";
+  if(!files.length||!sb||!userId){ if(!sb||!userId) alert("파일 첨부는 로그인 후 사용할 수 있습니다."); return; }
+  const bf=bankFiles(); bf[k]=bf[k]||[];
+  const fail=[];
+  for(let i=0;i<files.length;i++){
+    const f=files[i];
+    if(f.size>20*1024*1024){ fail.push(f.name+" (20MB 초과)"); continue; }
+    const dot=f.name.lastIndexOf(".");
+    const ext=dot>=0?f.name.slice(dot).replace(/[^\w.]/g,""):"";
+    let base=f.name.slice(0,dot>=0?dot:undefined).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,30)||"file";
+    const path=userId+"/bank/"+k+"_"+Date.now()+"_"+i+"_"+base+ext;
+    const {error}=await sb.storage.from("apply-docs").upload(path,f);
+    if(error){ fail.push(f.name+" ("+error.message+")"); continue; }
+    bf[k].push({name:f.name,path:path});
+  }
+  await saveProfileRemote(); renderBankFiles();
+  if(fail.length) alert("일부 실패:\n"+fail.join("\n"));
+}
+async function bankOpen(k,i){
+  const f=(bankFiles()[k]||[])[i]; if(!f||!sb) return;
+  const {data}=await sb.storage.from("apply-docs").createSignedUrl(f.path,3600);
+  if(data&&data.signedUrl) window.open(data.signedUrl,"_blank");
+}
+async function bankDelFile(k,i){
+  const bf=bankFiles(); const f=(bf[k]||[])[i]; if(!f) return;
+  if(!confirm("첨부를 삭제할까요?")) return;
+  if(sb){ try{ await sb.storage.from("apply-docs").remove([f.path]); }catch(e){} }
+  bf[k].splice(i,1); await saveProfileRemote(); renderBankFiles();
 }
 async function bankPrefill(){
   const btn=document.getElementById("bank-prefill");
@@ -2325,8 +2396,7 @@ async function bankPrefill(){
     const b=bank();
     const empty=BANK_FIELDS.filter(function(f){return !(b[f.k]||"").trim();});
     const raw=await callClaude([{role:"user",content:profileContext()+"\n\n위 회사 정보와 학습된 문서에서 확인 가능한 사실만으로 아래 항목을 채워라. 절대 지어내지 말 것 — 근거가 없으면 해당 키를 빈 문자열로 둬라. 각 항목 2~4문장.\n항목: "+empty.map(function(f){return f.k+"("+f.n+")";}).join(", ")+"\n반드시 JSON만 출력: {\""+empty.map(function(f){return f.k;}).join("\":\"\",\"")+"\":\"\"}"}],2200);
-    const mm=raw.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
-    const pj=JSON.parse(mm?mm[0]:raw);
+    const pj=parseJson(raw);
     let cnt=0;
     empty.forEach(function(f){ const v=String(pj[f.k]||"").trim(); if(v.length>=20){ b[f.k]=v; cnt++; } });
     await saveProfileRemote(); renderBank();
@@ -2342,8 +2412,7 @@ async function bankInterview(){
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 질문 준비 중…';
   try{
     const raw=await callClaude([{role:"user",content:profileContext()+"\n\n너는 사업계획서 컨설턴트다. 아래 빈 항목을 채우기 위해 대표에게 물어볼 질문을 만들어라. 대표가 1~2문장으로 바로 답할 수 있는 구체적 질문이어야 한다.\n빈 항목: "+empty.map(function(f){return f.k+"("+f.n+")";}).join(", ")+"\n반드시 JSON만 출력: {\"qs\":[{\"k\":\"항목키\",\"q\":\"질문\"} 최대 5개 — 사업계획서에서 가장 중요한 항목 우선]}"}],900);
-    const mm=raw.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
-    const qs=(JSON.parse(mm?mm[0]:raw).qs||[]).slice(0,5);
+    const qs=(parseJson(raw).qs||[]).slice(0,5);
     if(!qs.length){ alert("질문 생성에 실패했습니다."); btn.disabled=false; btn.textContent="AI 인터뷰로 빈칸 채우기"; return; }
     const answers=[];
     for(let i=0;i<qs.length;i++){
@@ -2354,8 +2423,7 @@ async function bankInterview(){
     if(!answers.length){ btn.disabled=false; btn.textContent="AI 인터뷰로 빈칸 채우기"; return; }
     btn.innerHTML='<span class="spinner"></span> 답변을 정리하는 중…';
     const raw2=await callClaude([{role:"user",content:profileContext()+"\n\n대표의 답변을 사업계획서에 쓸 수 있는 문장으로 다듬어라. 답변에 없는 사실·수치는 절대 추가하지 말 것. 각 2~4문장.\n"+answers.map(function(x){return "["+x.k+"] Q:"+x.q+" A:"+x.a;}).join("\n")+"\n반드시 JSON만 출력: {\""+answers.map(function(x){return x.k;}).join("\":\"\",\"")+"\":\"\"}"}],1600);
-    const mm2=raw2.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
-    const pj2=JSON.parse(mm2?mm2[0]:raw2);
+    const pj2=parseJson(raw2);
     answers.forEach(function(x){ const v=String(pj2[x.k]||"").trim(); if(v) b[x.k]=v; });
     await saveProfileRemote(); renderBank();
     alert(answers.length+"개 항목이 정리되어 저장되었습니다.");
@@ -2398,29 +2466,78 @@ function renderWriter(){
         '<button class="btn btn-primary" onclick="newPlan('+x.i+')">이 공고로 작성 시작</button></div>';
     }).join(""):'<div class="empty">공고를 먼저 스크랩하거나 지원 시작을 눌러주세요.</div>')+'</div>';
 }
-async function newPlan(idx){
+function newPlan(idx){
   const a=ANNS[idx];
   const el=document.getElementById("writer-body");
-  el.innerHTML='<div class="panel"><h3>공고 분석 중</h3><div id="np-log" style="font-size:13px;color:var(--ink-soft);line-height:2.1;"></div></div>';
-  function log(t){ document.getElementById("np-log").innerHTML+=t+"<br>"; }
+  el.innerHTML=
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;"><button class="btn" onclick="curPlan=null;renderWriter();">← 목록</button>'+
+    '<b style="font-family:var(--serif);font-size:16px;flex:1;">'+esc(a.title.slice(0,60))+'</b></div>'+
+    '<div class="panel" style="margin-bottom:14px;"><h3>1단계 · 사업계획서 양식 준비</h3>'+
+    '<p style="font-size:13px;color:var(--ink-soft);line-height:1.75;">공고에서 내려받은 <b>사업계획서 양식 파일</b>이나 <b>공고 안내문</b>을 올리면, 그 양식의 실제 목차·항목·배점 그대로 작성합니다. 양식이 없으면 공고 원문에서 자동으로 추출합니다.</p>'+
+    (a.attach&&a.attach.length?('<div style="margin-top:12px;"><b style="font-size:12.5px;">공고 첨부파일 (여기서 양식을 내려받으세요)</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">'+a.attach.map(function(f){return '<a class="btn" style="font-size:12px;" target="_blank" href="'+esc(f.url)+'">📎 '+esc((f.name||"첨부").slice(0,28))+'</a>';}).join("")+'</div></div>'):'')+
+    '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'+
+      '<a class="btn" target="_blank" href="'+esc(a.url)+'">원문 공고 열기 ↗</a>'+
+      '<input type="file" id="form-file" class="hidden" accept=".pdf,.txt,.md,.hwp,.docx" onchange="onFormPick(this)">'+
+      '<button class="btn btn-primary" onclick="document.getElementById(\'form-file\').click()">📄 양식 파일 올리기 (PDF·TXT)</button>'+
+      '<span id="form-name" style="font-size:12.5px;color:var(--ink-soft);"></span>'+
+    '</div>'+
+    '<div class="field" style="margin-top:14px;"><label>또는 양식 목차를 직접 붙여넣기</label><textarea id="form-paste" rows="4" placeholder="예)&#10;1. 문제인식 (배점 20)&#10; 1-1. 창업 아이템 배경 및 필요성&#10;2. 실현가능성 (배점 30)&#10; 2-1. 개발 방안..."></textarea></div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">'+
+      '<button class="btn btn-seal" onclick="buildPlan('+idx+',true)">양식 반영해 목차 만들기</button>'+
+      '<button class="btn" onclick="buildPlan('+idx+',false)">양식 없이 자동 추출</button>'+
+    '</div>'+
+    '<div id="np-log" style="font-size:13px;color:var(--ink-soft);line-height:2.1;margin-top:12px;"></div></div>';
+}
+let formFile=null;
+function onFormPick(input){
+  formFile=input.files[0]||null;
+  const el=document.getElementById("form-name");
+  if(el) el.textContent=formFile?("✓ "+formFile.name+(/\.(hwp|docx)$/i.test(formFile.name)?" — 한글/워드 파일은 내용 추출이 제한적입니다. 목차를 붙여넣으면 더 정확합니다.":"")):"";
+}
+async function buildPlan(idx,useForm){
+  const a=ANNS[idx];
+  const logEl=document.getElementById("np-log");
+  function log(t){ logEl.innerHTML+=t+"<br>"; }
+  logEl.innerHTML="";
   try{
-    log('<span class="spinner dark"></span> ① 공고 원문을 가져오는 중…');
+    let formTxt=(document.getElementById("form-paste").value||"").trim();
+    if(useForm&&formFile){
+      log('<span class="spinner dark"></span> 양식 파일을 읽는 중…');
+      if(formFile.type==="application/pdf"){
+        const b64=await new Promise(function(ok,no){const r=new FileReader();r.onload=function(){ok(r.result.split(",")[1]);};r.onerror=no;r.readAsDataURL(formFile);});
+        const ext=await callClaude([{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:"이 사업계획서 양식 문서의 목차 구조를 빠짐없이 그대로 추출해라. 항목 번호·제목·배점·분량 제한이 있으면 함께. 목록만 출력."}]}],1800);
+        formTxt=(formTxt?formTxt+"\n":"")+ext;
+      }else{
+        try{ formTxt=(formTxt?formTxt+"\n":"")+(await formFile.text()).slice(0,12000); }catch(e){}
+      }
+      log("&nbsp;&nbsp;→ 양식 내용 확보 ✓");
+    }
     let doc="";
-    try{ const r=await fetch("/api/fetchdoc?url="+encodeURIComponent(a.url)); const dj=await r.json(); if(dj&&dj.ok) doc=dj.text||""; }catch(e){}
-    log(doc?("&nbsp;&nbsp;→ 원문 "+doc.length.toLocaleString()+"자 확보 ✓"):"&nbsp;&nbsp;→ 원문 접근 불가 — 표준 목차로 진행");
-    log('<span class="spinner dark"></span> ② 제출 양식의 목차와 평가 배점을 추출하는 중…');
-    const raw=await callClaude([{role:"user",content:"[공고]\n제목: "+a.title+"\n요약: "+a.summary+(doc?("\n\n[원문]\n"+doc.slice(0,9000)):"")+"\n\n이 공고의 사업계획서 제출 양식 목차를 추출해라. 원문에 목차·평가항목·배점이 있으면 그대로, 없으면 이 사업 유형의 표준 목차로 구성해라.\n반드시 JSON만 출력: {\"formName\":\"양식명\",\"sections\":[{\"id\":\"s1\",\"title\":\"섹션 제목\",\"guide\":\"이 섹션에 반드시 들어가야 할 내용 1문장\",\"points\":배점(모르면 0),\"len\":권장분량(자)} 5~8개],\"criteria\":\"평가 배점표 요약(없으면 표준 심사 기준)\"}"}],1800);
-    const mm=raw.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
-    const pj=JSON.parse(mm?mm[0]:raw);
+    if(!formTxt){
+      log('<span class="spinner dark"></span> 공고 원문을 가져오는 중…');
+      try{ const r=await fetch("/api/fetchdoc?url="+encodeURIComponent(a.url)); const dj=await r.json(); if(dj&&dj.ok) doc=dj.text||""; }catch(e){}
+      log(doc?("&nbsp;&nbsp;→ 원문 "+doc.length.toLocaleString()+"자 확보 ✓"):"&nbsp;&nbsp;→ 원문 접근 불가 — 표준 목차로 진행");
+    }
+    log('<span class="spinner dark"></span> 목차와 배점을 정리하는 중…');
+    const raw=await callClaude([{role:"user",content:"[공고]\n"+a.title+"\n요약: "+a.summary+
+      (formTxt?("\n\n[제출 양식 목차 — 이것을 최우선으로 그대로 따를 것]\n"+formTxt.slice(0,8000)):"")+
+      (doc?("\n\n[공고 원문]\n"+doc.slice(0,8000)):"")+
+      "\n\n사업계획서 작성용 목차를 만들어라. 양식이 주어졌으면 그 항목명·순서·배점을 그대로 사용하고 임의로 바꾸지 마라. 없으면 이 사업 유형의 표준 목차로.\n반드시 JSON만 출력: {\"formName\":\"양식명\",\"sections\":[{\"id\":\"s1\",\"title\":\"항목명(양식 그대로)\",\"guide\":\"이 항목에 들어갈 내용 1문장\",\"points\":배점(없으면0),\"len\":권장분량자수}],\"criteria\":\"평가 배점표 요약\"}"}],2200);
+    const pj=parseJson(raw);
+    const secs=(pj.sections||[]).filter(function(s){return s&&(s.title||s.name);});
+    if(!secs.length) throw new Error("EMPTY");
     const key="pl"+Date.now();
     docs()[key]={key:key,annKey:a.key,idx:idx,title:a.title,formName:pj.formName||"사업계획서",criteria:pj.criteria||"",
-      sections:(pj.sections||[]).map(function(s,i){return {id:s.id||("s"+i),title:s.title||("섹션 "+(i+1)),guide:s.guide||"",points:s.points||0,len:s.len||700,text:""};}),
+      formSrc:formTxt?"업로드한 양식 기준":(doc?"공고 원문 기준":"표준 목차"),
+      sections:secs.map(function(s,i){return {id:s.id||("s"+i),title:s.title||s.name,guide:s.guide||"",points:s.points||0,len:s.len||700,text:""};}),
       at:Date.now(),atStr:fmtDate(new Date()),score:0};
     await saveProfileRemote();
-    log("&nbsp;&nbsp;→ "+(pj.sections||[]).length+"개 섹션 추출 완료 ✓");
+    log("&nbsp;&nbsp;→ "+secs.length+"개 항목 구성 완료 ✓");
+    formFile=null;
     openPlan(key);
-  }catch(e){ el.innerHTML=claudeErrHtml(e)+'<button class="btn" style="margin-top:12px;" onclick="curPlan=null;renderWriter();">← 돌아가기</button>'; }
+  }catch(e){ logEl.innerHTML=claudeErrHtml(e); }
 }
+
 function openPlan(k){ curPlan=k; renderPlanEditor(); }
 async function delPlan(k){ if(!confirm("이 사업계획서를 삭제할까요?")) return; delete docs()[k]; await saveProfileRemote(); renderWriter(); }
 let curSec=0;
@@ -2434,10 +2551,11 @@ function renderPlanEditor(){
     '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;">'+
       '<button class="btn" onclick="curPlan=null;renderWriter();">← 목록</button>'+
       '<div style="flex:1;min-width:200px;"><b style="font-family:var(--serif);font-size:17px;">'+esc(p.formName)+'</b>'+
-      '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px;">'+esc(p.title.slice(0,50))+'</div></div>'+
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px;">'+esc(p.title.slice(0,46))+(p.formSrc?(' · '+esc(p.formSrc)):'')+'</div></div>'+
       '<button class="btn btn-primary" onclick="genAllSections()">전 섹션 자동 작성</button>'+
       '<button class="btn btn-seal" onclick="reviewPlan()">심사 검수 실행</button>'+
-      '<button class="btn" onclick="exportPlan()">📄 내보내기</button>'+
+      '<button class="btn" onclick="exportPlan()">📄 내려받기</button>'+
+      '<button class="btn btn-primary" onclick="savePlanToApply()">📌 지원 현황에 저장</button>'+
     '</div>'+
     '<div class="wr-wrap">'+
       '<div class="wr-toc panel" style="padding:14px;">'+
@@ -2528,8 +2646,7 @@ async function reviewPlan(){
   try{
     const body=p.sections.map(function(s){return "["+s.title+(s.points?("/"+s.points+"점"):"")+"]\n"+(s.text||"(미작성)");}).join("\n\n").slice(0,12000);
     const raw=await callClaude([{role:"user",content:"너는 이 공고의 서면평가 심사위원이다.\n[공고] "+p.title+"\n[평가 기준] "+(p.criteria||"표준 심사")+"\n\n[제출된 사업계획서]\n"+body+"\n\n실제 심사하듯 냉정하게 평가해라. 반드시 JSON만 출력:\n{\"score\":0~100,\"summary\":\"총평 2문장\",\"items\":[{\"sec\":\"섹션명\",\"score\":점수,\"good\":\"잘된 점\",\"fix\":\"반드시 고칠 점(구체적으로)\"} 각 섹션],\"priority\":[\"점수를 가장 크게 올릴 수정 3가지\"],\"risk\":\"탈락 위험 요소 1~2가지\"}"}],2200);
-    const mm=raw.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
-    const j=JSON.parse(mm?mm[0]:raw);
+    const j=parseJson(raw);
     p.score=Math.max(0,Math.min(100,Math.round(Number(j.score)||0)));
     const html='<div class="panel"><h3>심사 검수 결과 · '+p.score+'점</h3>'+
       '<div class="gauge"><span style="width:'+p.score+'%"></span></div>'+
@@ -2558,6 +2675,30 @@ async function autoImprove(){
     }catch(e){}
   }
   await reviewPlan();
+}
+async function savePlanToApply(){
+  const p=docs()[curPlan];
+  const idx=ANNS.findIndex(function(x){return x.key===p.annKey;});
+  if(idx<0){ alert("연결된 공고를 찾을 수 없습니다."); return; }
+  if(!sb||!userId){ alert("지원 현황 연동은 로그인 후 사용할 수 있습니다."); return; }
+  const a=ANNS[idx];
+  if(scraps[a.key]===undefined) await toggleScrap(idx);
+  const sc=scrapOf(a.key);
+  sc.detail.applied=true;
+  if(sc.status==="검토 중") sc.status="작성 중";
+  // 문서 파일로 저장해 ① 신청 제출 서류에 등록
+  const body=p.sections.map(function(s){return '<h2 style="font-size:15pt;">'+esc(s.title)+'</h2><div style="font-size:11pt;line-height:1.8;white-space:pre-wrap;">'+esc(s.text||"")+'</div>';}).join("");
+  const full='<html><head><meta charset="utf-8"></head><body style="font-family:\'Malgun Gothic\',sans-serif;"><h1 style="font-size:19pt;text-align:center;">'+esc(p.formName)+'</h1><p style="text-align:center;font-size:10pt;color:#666;">'+esc(PROFILE.company||"")+'</p>'+body+'</body></html>';
+  const blob=new Blob(["\ufeff"+full],{type:"application/msword"});
+  const fname=(PROFILE.company||"사업계획서")+"_"+p.formName.replace(/[^\w가-힣]/g,"")+"_"+fmtDate(new Date()).replace(/[^0-9]/g,"")+".doc";
+  const path=userId+"/"+String(a.key).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,40)+"/subs_"+Date.now()+"_plan.doc";
+  const {error}=await sb.storage.from("apply-docs").upload(path,blob);
+  if(error){ alert("저장 실패: "+error.message); return; }
+  sc.detail.subs=sc.detail.subs||[];
+  sc.detail.subs.push({name:fname,path:path});
+  applyKey=a.key; applyIdx=idx;
+  await saveApply(false);
+  if(confirm("지원 현황의 '① 신청·서면평가 제출 서류'에 저장했습니다.\n\n지원 관리 페이지로 이동할까요?")) openApply(idx);
 }
 function exportPlan(){
   const p=docs()[curPlan];
