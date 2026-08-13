@@ -7,7 +7,8 @@
 //                       (공공데이터포털 일반 인증키 — K-Startup 키와 값이 같아도 별도 등록해야 동작)
 // ?fresh=1 을 붙이면 캐시를 무시하고 새로 수집합니다.
 
-let cache = { at: 0, payload: null }; // 약 3시간 캐시
+let cache = { at: 0, payload: null };
+let LG = { ks: { at: 0, items: [] }, sm: { at: 0, items: [] }, bz: { at: 0, items: [] }, ms: { at: 0, items: [] } }; // 소스별 최근 성공분
 
 function stripHtml(s) {
   return String(s || "")
@@ -152,8 +153,14 @@ async function fetchMsit(key) {
     seenMs.add(k);
     const dept = stripHtml(tag(b, "deptName"));
     const contact = [dept, stripHtml(tag(b, "managerName")), stripHtml(tag(b, "managerTel"))].filter(Boolean).join(" · ");
+    const attach = [];
+    const fnames = []; const furls = [];
+    let fm; const fnRe = /<fileName>([\s\S]*?)<\/fileName>/g, fuRe = /<fileUrl>([\s\S]*?)<\/fileUrl>/g;
+    while ((fm = fnRe.exec(b)) !== null) fnames.push(stripHtml(fm[1]));
+    while ((fm = fuRe.exec(b)) !== null) furls.push(fm[1].replace(/&amp;/g, "&").trim());
+    furls.forEach((u, ix) => { if (/^https?:/.test(u)) attach.push({ name: fnames[ix] || ("첨부 " + (ix + 1)), url: u }); });
     return {
-      key: k, title: title, field: "기술·R&D",
+      key: k, title: title, field: "기술·R&D", attach: attach,
       agency: "과학기술정보통신부" + (dept ? " " + dept : ""),
       period: "", registered: ymd(press),
       summary: (contact ? "담당: " + contact + " — " : "") + "접수기간·자격요건은 원문 공고를 확인하세요.",
@@ -202,8 +209,17 @@ async function fetchSmes(key) {
     let link = pick(it, ["pblancDtlUrl", "dtlUrl", "detailUrl", "reqstLinkInfo", "refrncUrl", "url", "link", "pblancUrl", "hmpgUrl"]);
     if (link && link.startsWith("/")) link = "https://www.smes.go.kr" + link;
     if (link && !/^https?:/i.test(link)) link = "";
+    const attach = [];
+    const atUrl = pick(it, ["pblancAttach", "attachUrl", "atchFileUrl"]);
+    const atNm = pick(it, ["pblancAttachNm", "attachNm", "atchFileNm"]);
+    if (atUrl) {
+      const urls = atUrl.split(/[,|]/).map((x) => x.trim()).filter((x) => /^https?:/.test(x) || x.startsWith("/"));
+      const names = atNm.split(/[,|]/).map((x) => x.trim());
+      urls.forEach((u, ix) => attach.push({ name: names[ix] || ("첨부 " + (ix + 1)), url: u.startsWith("/") ? "https://www.smes.go.kr" + u : u }));
+    }
     return {
       key: "sm-" + (pick(it, ["pblancId", "pblancSn", "sn", "id", "seq"]) || link || title).slice(0, 110),
+      attach: attach,
       title: title,
       field: stripHtml(pick(it, ["bizType", "sportType", "lclasNm", "pldirSportRealmLclasCodeNm", "bsnsSeNm", "cl", "category"])) || "중기부 지원사업",
       agency: stripHtml(pick(it, ["cntcInsttNm", "insttNm", "jrsdInsttNm", "excInsttNm", "sportInsttNm", "orgNm"])) || "중소벤처24",
@@ -289,10 +305,17 @@ module.exports = async (req, res) => {
   const bzRes = results[2].status === "fulfilled" ? results[2].value : { items: [], note: "호출 실패: " + String(results[2].reason).slice(0, 100) };
   const bz = bzRes.items || [];
   const msRes = results[3].status === "fulfilled" ? results[3].value : { items: [], note: "호출 실패: " + String(results[3].reason).slice(0, 100) };
-  const ms = msRes.items || [];
+  let ms = msRes.items || [];
+  // 일시 장애 소스는 24시간 내 최근 성공분으로 대체
+  let ks2 = ks, sm2 = sm, bz2 = bz;
+  const DAY = 24 * 60 * 60 * 1000, now = Date.now();
+  if (ks2.length) LG.ks = { at: now, items: ks2 }; else if (LG.ks.items.length && now - LG.ks.at < DAY) { ks2 = LG.ks.items; }
+  if (sm2.length) LG.sm = { at: now, items: sm2 }; else if (LG.sm.items.length && now - LG.sm.at < DAY) { sm2 = LG.sm.items; smRes.note = (smRes.note || "") + " → 이전 수집분 재사용"; }
+  if (bz2.length) LG.bz = { at: now, items: bz2 }; else if (LG.bz.items.length && now - LG.bz.at < DAY) { bz2 = LG.bz.items; }
+  if (ms.length) LG.ms = { at: now, items: ms }; else if (LG.ms.items.length && now - LG.ms.at < DAY) { ms = LG.ms.items; }
 
   const map = new Map();
-  for (const it of [...ks, ...sm, ...bz, ...ms]) {
+  for (const it of [...ks2, ...sm2, ...bz2, ...ms]) {
     const norm = it.title.replace(/^\[[^\]]*\]\s*/, "").replace(/\s+/g, "").slice(0, 40);
     if (map.has(norm)) { map.get(norm).dual = true; continue; }
     map.set(norm, it);
@@ -306,16 +329,16 @@ module.exports = async (req, res) => {
   }
 
   const parts = [];
-  if (ks.length) parts.push("kstartup");
-  if (sm.length) parts.push("smes24");
-  if (bz.length) parts.push("bizinfo");
+  if (ks2.length) parts.push("kstartup");
+  if (sm2.length) parts.push("smes24");
+  if (bz2.length) parts.push("bizinfo");
   if (ms.length) parts.push("msit");
   const payload = {
     source: parts.join("+") || "seed",
     count: items.length,
-    kstartup_count: ks.length,
-    smes24_count: sm.length,
-    bizinfo_count: bz.length,
+    kstartup_count: ks2.length,
+    smes24_count: sm2.length,
+    bizinfo_count: bz2.length,
     msit_count: ms.length,
     smes24_note: smRes.note || "",
     bizinfo_note: bzRes.note || "",
