@@ -390,11 +390,12 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     <button class="nav-item" data-nav="scrap" onclick="go('scrap')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4V3z"/></svg>스크랩 · 지원 현황</button>
     <div class="nav-label">AI</div>
     <button class="nav-item" data-nav="profile" onclick="go('profile')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5M5 3h9l5 5v13H5V3z"/></svg>사업 프로필 · 문서 학습</button>
+    <button class="nav-item" data-nav="roadmap" onclick="go('roadmap')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20l6-3 6 3 6-3V4l-6 3-6-3-6 3v16zM9 4v13M15 7v13"/></svg>성장 로드맵</button>
     <button class="nav-item" onclick="openChat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/></svg>AI 비서에게 질문하기</button>
     <div class="nav-label">설정</div>
     <button class="nav-item" data-nav="alerts" onclick="go('alerts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a2 2 0 003.4 0"/></svg>알림 설정</button>
     <button class="nav-item hidden" id="nav-admin" data-nav="admin" onclick="go('admin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3 1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9 1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>ADMIN</button>
-    <div class="sidebar-foot"><span id="side-src">공고 수집 대기 중</span><br><span style="font-size:11px;">공고 출처: 창업진흥원 K-Startup · 중소벤처24 · 기업마당(공공데이터)</span></div>
+    <div class="sidebar-foot"><span id="side-src">공고 수집 대기 중</span><br><span style="font-size:11px;">공고 출처: K-Startup · 중소벤처24 · 기업마당 · 과기부(공공데이터)</span></div>
   </aside>
 
   <main class="main">
@@ -446,10 +447,11 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     </div>
 
     <div id="view-search" class="view">
-      <div class="page-head"><h1>전체 공고 검색</h1><p id="search-desc">수집된 진행 중 공고를 검색합니다. 적합도는 내 프로필 기준으로 자동 계산됩니다.<br><span style="font-size:12px;color:var(--ink-faint);">출처: 창업진흥원 K-Startup, 중소벤처기업부 중소벤처24·기업마당 (공공데이터 Open API)</span></p></div>
+      <div class="page-head"><h1>전체 공고 검색</h1><p id="search-desc">수집된 진행 중 공고를 검색합니다. 적합도는 내 프로필 기준으로 자동 계산됩니다.<br><span style="font-size:12px;color:var(--ink-faint);">출처: 창업진흥원 K-Startup, 중소벤처기업부 중소벤처24·기업마당, 과학기술정보통신부 사업공고 (공공데이터 Open API)</span></p></div>
       <div class="search-bar">
         <input id="q" type="search" placeholder="공고명, 키워드 검색 (예: 마케팅, R&D, 수출)" oninput="renderSearch()">
         <select id="f-cat" onchange="renderSearch()"><option value="">분야 전체</option></select>
+        <select id="f-src" onchange="renderSearch()"><option value="">출처 전체</option></select>
         <select id="f-sort" onchange="renderSearch()"><option value="score">적합도순</option><option value="dday">마감임박순</option><option value="new">최신등록순</option></select>
       </div>
       <p class="result-count" id="result-count"></p>
@@ -475,7 +477,14 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     </div>
 
     <div id="view-scrap" class="view">
-      <div class="page-head"><h1>스크랩 · 지원 현황</h1><p>관심 공고를 모아두고 검토 → 작성 → 제출까지 진행 상태를 관리하세요.</p></div>
+      <div class="page-head"><h1>스크랩 · 지원 현황</h1><p>공고 검토 → 서류 작성 → 제출 → 발표평가 → 선정 → 수행 → 완료까지 전 과정을 한곳에서 관리하세요.</p></div>
+      <div class="tabs" id="scrap-tabs" style="margin-bottom:14px;">
+        <button class="tab active" data-sf="all">전체</button>
+        <button class="tab" data-sf="prep">검토·작성</button>
+        <button class="tab" data-sf="submit">제출·발표</button>
+        <button class="tab" data-sf="run">선정·수행</button>
+        <button class="tab" data-sf="done">완료·종료</button>
+      </div>
       <div id="scrap-list"></div>
     </div>
 
@@ -574,6 +583,23 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
       </div>
     </div>
 
+    <div id="view-roadmap" class="view">
+      <div class="page-head"><h1>기업 성장 로드맵</h1><p>사업 프로필과 학습된 문서를 바탕으로, 우리 회사가 연차·산업 특성에 맞춰 준비해야 할 인증·제도를 AI가 설계합니다. 인증은 정부지원사업의 가점·자격과 직결됩니다.</p></div>
+      <div class="two-col">
+        <div class="panel">
+          <h3>우리 회사 맞춤 로드맵 <span id="roadmap-at" style="font-size:11px;color:var(--ink-faint);font-weight:500;"></span></h3>
+          <div id="roadmap-body" style="font-size:13.5px;line-height:1.85;color:var(--ink-soft);">아직 생성된 로드맵이 없습니다. 아래 버튼으로 만들어 보세요. (프로필이 자세할수록 정확해집니다)</div>
+          <div style="margin-top:14px;"><button class="btn btn-seal" id="roadmap-btn" onclick="genRoadmap(true)">AI 로드맵 생성 / 다시 생성</button></div>
+        </div>
+        <div class="panel">
+          <h3>인증·제도별 AI 가이드</h3>
+          <p style="font-size:12.5px;color:var(--ink-soft);margin-bottom:10px;line-height:1.6;">항목을 누르면 우리 회사 기준의 상세 가이드(혜택·요건·절차·서류·기간·팁)를 AI가 작성합니다. ✓ 표시는 이미 생성되어 저장된 가이드입니다.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="cert-chips"></div>
+          <p class="mini-note">가이드는 계정에 저장되어 다시 열면 즉시 표시됩니다.</p>
+        </div>
+      </div>
+    </div>
+
     <div id="view-admin" class="view">
       <div class="page-head"><h1>운영 관리 (ADMIN)</h1><p>가입 회원과 사용 현황입니다. 관리자 계정에만 표시됩니다.</p></div>
       <div class="head-stats" style="margin-bottom:16px;flex-wrap:wrap;" id="admin-stats"></div>
@@ -639,8 +665,8 @@ let annSource = "loading"; // bizinfo | seed
 let scraps = {};           // ann_key -> status
 let currentView = "login";
 const TODAY = new Date(); TODAY.setHours(0,0,0,0);
-const STATUS = ["검토 중","작성 중","제출 완료","발표평가 진행","최종 선정","미선정","보류"];
-const STCLASS = {"검토 중":"st-review","작성 중":"st-writing","제출 완료":"st-review","발표평가 진행":"st-writing","최종 선정":"st-done","미선정":"st-fail","보류":""};
+const STATUS = ["검토 중","작성 중","제출 완료","발표평가 진행","최종 선정","수행 중","수행 완료","미선정","보류"];
+const STCLASS = {"검토 중":"st-review","작성 중":"st-writing","제출 완료":"st-review","발표평가 진행":"st-writing","최종 선정":"st-done","수행 중":"st-writing","수행 완료":"st-done","미선정":"st-fail","보류":""};
 const ADMIN_EMAIL = "ljh4013@naver.com";
 
 let PROFILE = {
@@ -651,6 +677,19 @@ let PROFILE = {
 /* ══ 유틸 ══ */
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function mdLite(t){return esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/^#{2,3} (.+)$/gm,"<b>$1</b>");}
+function mdRich(t){
+  const lines=esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").split(/\n/);
+  let out="",inUl=false;
+  for(const raw of lines){
+    const l=raw.trim();
+    if(/^#{2,3}\s+/.test(l)){ if(inUl){out+="</ul>";inUl=false;} out+='<div class="sec-title" style="margin:20px 0 10px;">'+l.replace(/^#{2,3}\s+/,"")+'</div>'; }
+    else if(/^[-•*]\s+/.test(l)){ if(!inUl){out+='<ul style="padding-left:18px;display:flex;flex-direction:column;gap:7px;margin:4px 0 8px;">';inUl=true;} out+='<li>'+l.replace(/^[-•*]\s+/,"")+'</li>'; }
+    else if(l===""){ if(inUl){out+="</ul>";inUl=false;} }
+    else { if(inUl){out+="</ul>";inUl=false;} out+='<p style="margin:6px 0;">'+l+'</p>'; }
+  }
+  if(inUl)out+="</ul>";
+  return out;
+}
 function fmtDate(d){return d.getFullYear()+". "+String(d.getMonth()+1).padStart(2,"0")+". "+String(d.getDate()).padStart(2,"0")+".("+["일","월","화","수","목","금","토"][d.getDay()]+")";}
 function greet(){return userEmail ? userEmail.split("@")[0]+"님" : "대표님";}
 function msg(id, type, text){document.getElementById(id).innerHTML = text ? '<div class="auth-msg '+type+'">'+esc(text)+'</div>' : "";}
@@ -742,6 +781,9 @@ function applyAnnItems(items){
   const cats=[...new Set(ANNS.map(a=>a.field))].filter(Boolean);
   const sel=document.getElementById("f-cat");
   sel.innerHTML='<option value="">분야 전체</option>'+cats.map(c=>'<option>'+esc(c)+'</option>').join("");
+  const srcs=[...new Set(ANNS.map(a=>a.source))].filter(Boolean);
+  const ssel=document.getElementById("f-src");
+  if(ssel){ const curS=ssel.value; ssel.innerHTML='<option value="">출처 전체</option>'+srcs.map(s=>'<option '+(s===curS?"selected":"")+'>'+esc(s)+'</option>').join(""); }
   document.getElementById("side-src").textContent = (annSource==="seed") ? "예시 공고 표시 중" : srcLabel()+" 실시간 연동 · "+ANNS.length+"건";
   applyAiCache();
 }
@@ -857,6 +899,7 @@ function go(v, fromPop){
   if(v==="alerts"){var _ms=document.getElementById("ai-model"); if(_ms)_ms.value=(PROFILE.extra&&PROFILE.extra.model)||"gpt-5.6-terra";}
   if(v==="admin") loadAdmin();
   if(v==="insight") renderInsightView();
+  if(v==="roadmap") showRoadmap();
   if(!fromPop) pushNav({v:v});
 }
 function enterApp(){
@@ -957,7 +1000,9 @@ async function setStatus(idx,st){
   renderScrap();
 }
 function renderScrap(){
-  const list=ANNS.map((a,i)=>({a,i})).filter(x=>scraps[x.a.key]!==undefined);
+  const GROUPS={prep:["검토 중","작성 중","보류"],submit:["제출 완료","발표평가 진행"],run:["최종 선정","수행 중"],done:["수행 완료","미선정"]};
+  let list=ANNS.map((a,i)=>({a,i})).filter(x=>scraps[x.a.key]!==undefined);
+  if(scrapFilter!=="all"){ const g=GROUPS[scrapFilter]||[]; list=list.filter(x=>g.indexOf((scraps[x.a.key]&&scraps[x.a.key].status)||"검토 중")>=0); }
   document.getElementById("scrap-list").innerHTML = list.length ? list.map(({a,i})=>{
     const st=(scraps[a.key]&&scraps[a.key].status)||"검토 중"; const dt=(scraps[a.key]&&scraps[a.key].detail)||{};
     return '<div class="scrap-row">'+stampHtml(a,true)+
@@ -975,8 +1020,9 @@ function renderScrap(){
 function renderSearch(){
   const q=(document.getElementById("q").value||"").toLowerCase();
   const cat=document.getElementById("f-cat").value;
+  const srcF=document.getElementById("f-src")?document.getElementById("f-src").value:"";
   const sort=document.getElementById("f-sort").value;
-  let list=ANNS.filter(a=>(!q||(a.title+" "+a.summary+" "+a.field).toLowerCase().includes(q))&&(!cat||a.field===cat));
+  let list=ANNS.filter(a=>(!q||(a.title+" "+a.summary+" "+a.field).toLowerCase().includes(q))&&(!cat||a.field===cat)&&(!srcF||a.source===srcF));
   if(sort==="dday") list=[...list].sort((x,y)=>(x.dday<0?9999:x.dday)-(y.dday<0?9999:y.dday));
   else if(sort==="new") list=[...list].sort((x,y)=>String(y.registered).localeCompare(String(x.registered)));
   else list=[...list].sort((x,y)=>y.score-x.score);
@@ -1029,7 +1075,8 @@ function openDetail(idx, fromPop){
     '<p class="mini-note">자동 체크는 참고용입니다. 최종 자격은 반드시 원문 공고로 확인하세요.</p>'+
     '</div><div class="side-panels">'+
     '<div class="panel"><h3>다음 행동</h3>'+
-    '<button class="btn btn-seal btn-lg" onclick="openGuide('+idx+')" style="margin-bottom:8px;">✍ 작성 가이드 열기</button>'+
+    '<button class="btn btn-seal btn-lg" onclick="startApply('+idx+')" style="margin-bottom:8px;">🚀 지원 시작 — 스크랩·지원 관리</button>'+
+    '<button class="btn btn-lg" onclick="openGuide('+idx+')" style="margin-bottom:8px;">✍ 작성 가이드 열기</button>'+
     '<button class="btn btn-lg" onclick="openChat('+idx+')" style="margin-bottom:8px;">이 공고에 대해 AI 비서에게 질문</button>'+
     '<button class="btn btn-lg" onclick="toggleScrap('+idx+')">'+(scrapped?"★ 스크랩 해제":"☆ 스크랩하고 캘린더에 담기")+'</button></div>'+
     '<div class="panel"><h3>비슷한 공고</h3>'+
@@ -1048,6 +1095,12 @@ document.getElementById("cal-tabs").addEventListener("click",function(e){
   document.querySelectorAll("#cal-tabs .tab").forEach(function(x){x.classList.remove("active");});
   t.classList.add("active"); calMode=t.dataset.cm; renderCal();
 });
+let scrapFilter="all";
+document.getElementById("scrap-tabs").addEventListener("click",function(e){
+  var t=e.target.closest(".tab"); if(!t)return;
+  document.querySelectorAll("#scrap-tabs .tab").forEach(function(x){x.classList.remove("active");});
+  t.classList.add("active"); scrapFilter=t.dataset.sf; renderScrap();
+});
 function calMove(d){ calM+=d; if(calM<0){calM=11;calY--;} if(calM>11){calM=0;calY++;} renderCal(); }
 function renderCal(){
   document.getElementById("cal-title").textContent=calY+"년 "+(calM+1)+"월";
@@ -1061,7 +1114,7 @@ function renderCal(){
     const shown=evs.slice(0,3);
     html+='<div class="cal-cell '+(isToday?"today":"")+'"><span class="d">'+d+'</span>'+
       shown.map(({a,i})=>'<div class="cal-ev '+(scraps[a.key]!==undefined?"":"navy")+'" onclick="openDetail('+i+')" title="'+esc(a.title)+'">'+esc(a.title.replace(/^\[[^\]]*\]\s*/,"").slice(0,14))+'… 마감</div>').join("")+
-      (evs.length>3?'<div class="cal-ev" style="background:none;color:var(--ink-faint);cursor:default;">외 '+(evs.length-3)+'건</div>':'')+'</div>';
+      (evs.length>3?'<div class="cal-ev" style="background:none;color:var(--navy);cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();showDayAll('+calY+','+calM+','+d+')">외 '+(evs.length-3)+'건 보기</div>':'')+'</div>';
   }
   document.getElementById("cal-grid").innerHTML=html;
 }
@@ -1109,7 +1162,7 @@ function renderLearnedDoc(){
     '<h4>강점</h4><ul>'+((d.strengths||[]).map(function(s){return '<li>'+esc(s)+'</li>';}).join(""))+'</ul>'+
     '<h4>추천 지원 분야</h4><p style="color:var(--ink-soft);">'+((d.fields||[]).map(esc).join(" · "))+'</p>'+
     '<h4>보완 포인트</h4><ul>'+((d.improve||[]).map(function(s){return '<li>'+esc(s)+'</li>';}).join(""))+'</ul>'+
-    '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;"><button class="btn" onclick="resetLearning()" style="font-size:12px;">학습 초기화</button><span class="mini-note" style="margin:0;">새 문서를 분석하면 기존 학습 내용과 자동으로 통합됩니다.</span></div></div>';
+    '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><button class="btn btn-primary" id="apply-learn-btn" onclick="applyLearnedToProfile()" style="font-size:12px;">학습 내용으로 프로필 자동 업데이트</button><button class="btn" onclick="resetLearning()" style="font-size:12px;">학습 초기화</button><span class="mini-note" style="margin:0;">새 문서를 분석하면 기존 학습 내용과 자동으로 통합됩니다.</span></div></div>';
 }
 async function resetLearning(){
   if(!confirm("학습된 문서 내용을 모두 지울까요? 프로필 기본 정보는 유지됩니다.")) return;
@@ -1455,6 +1508,7 @@ function openApply(idx){
     '<div class="field"><label>협약 기간</label><input type="text" id="ap-period" value="'+esc(d.period||"")+'" placeholder="예: 2026.09 ~ 2027.08"></div>'+
     '</div>'+
     '<div class="field"><label>확정 지원금</label><input type="text" id="ap-fund" value="'+esc(d.fund||"")+'" placeholder="예: 7,000만 원"></div>'+
+    '<div class="field"><label>수행 일정 (협약·중간보고·최종보고·정산)</label><textarea id="ap-mile" rows="2" placeholder="예: 09.15 협약 / 12.20 중간보고 / 2027.06.30 최종보고·정산">'+esc(d.mile||"")+'</textarea></div>'+
     '<div class="field"><label>메모</label><textarea id="ap-memo" rows="3" placeholder="담당자 연락처, 보완 요청사항 등">'+esc(d.memo||"")+'</textarea></div>';
   renderApplyFiles();
   document.getElementById("apply-drawer").classList.add("open");
@@ -1500,7 +1554,7 @@ async function saveApply(close){
   const sc=scrapOf(applyKey);
   function g(id){var e=document.getElementById(id);return e?e.value:"";}
   if(document.getElementById("ap-status")) sc.status=g("ap-status");
-  sc.detail.agency=g("ap-agency"); sc.detail.period=g("ap-period"); sc.detail.fund=g("ap-fund");
+  sc.detail.agency=g("ap-agency"); sc.detail.period=g("ap-period"); sc.detail.fund=g("ap-fund"); sc.detail.mile=g("ap-mile");
   var m=document.getElementById("ap-memo"); if(m) sc.detail.memo=m.value;
   if(sb&&userId){
     const a=ANNS.find(function(x){return x.key===applyKey;})||{};
@@ -1531,7 +1585,7 @@ function renderInsightView(){
   if(!insightSel||!arr.some(function(x){return x.date===insightSel;})) insightSel=arr[0].date;
   tabs.innerHTML=arr.slice(0,30).map(function(x){return '<button class="tab '+(x.date===insightSel?"active":"")+'" onclick="insightSel=\''+x.date+'\';renderInsightView();">'+x.date.slice(5).replace("-",".")+'</button>';}).join("");
   const cur=arr.find(function(x){return x.date===insightSel;});
-  body.innerHTML=mdLite(cur.text);
+  body.innerHTML=mdRich(cur.text);
 }
 async function genInsight(force){
   const dash=document.getElementById("insight-body");
@@ -1544,7 +1598,7 @@ async function genInsight(force){
   if(full&&currentView==="insight") full.innerHTML='<span class="spinner dark"></span> 오늘의 리포트를 작성하고 있습니다…';
   try{
     const list=ANNS.slice(0,20).map(function(a){return "- ["+a.field+"] "+a.title+" ("+(a.dday===999?"상시":"D-"+a.dday)+")";}).join("\n");
-    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[오늘 수집된 최신 공고 상위 20건]\n"+list+"\n\n위 회사를 위한 '데일리 인사이트 리포트'를 상세하게 작성해라. 형식(마크다운 ## 헤더 사용):\n## 오늘의 지원사업 동향 — 4~5문장, 분야별 흐름과 눈에 띄는 변화\n## 주목할 공고 TOP 3 — 공고명을 명시하고 각각 왜 이 회사에 맞는지/주의할 자격요건은 무엇인지 2~3문장씩\n## 준비 체크포인트 — 이번 주 안에 챙겨야 할 서류·요건 2~3가지\n## 오늘의 추천 액션 — 구체적 행동 1~2가지\n한국어 900자 내외. 확실하지 않은 요건은 원문 확인을 권고."}],1600);
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[오늘 수집된 최신 공고 상위 20건]\n"+list+"\n\n위 회사를 위한 '데일리 인사이트 리포트'를 상세하게 작성해라. 형식(마크다운 ## 헤더 사용):\n## 오늘의 지원사업 동향 — 4~5문장, 분야별 흐름과 눈에 띄는 변화\n## 주목할 공고 TOP 3 — 공고명을 명시하고 각각 왜 이 회사에 맞는지/주의할 자격요건은 무엇인지 2~3문장씩\n## 준비 체크포인트 — 이번 주 안에 챙겨야 할 서류·요건 2~3가지\n## 오늘의 추천 액션 — 구체적 행동 1~2가지\n섹션 안의 항목은 반드시 '- ' 불릿으로 구분. 한국어 900자 내외. 확실하지 않은 요건은 원문 확인을 권고."}],1600);
     PROFILE.extra=PROFILE.extra||{};
     let ins=getInsights().filter(function(x){return x.date!==today;});
     ins.unshift({date:today,text:raw});
@@ -1598,6 +1652,116 @@ async function aiRerank(){
     if(currentView==="calendar")renderCal();
   }catch(e){}
   aiRerankRunning=false;
+}
+
+/* ══ 학습 내용 → 프로필 자동 반영 ══ */
+async function applyLearnedToProfile(){
+  const ex=PROFILE.extra||{};
+  const d=ex.learned||ex.doc;
+  if(!d){ alert("먼저 문서를 학습시켜 주세요."); return; }
+  if(!confirm("학습된 내용을 바탕으로 프로필(사업 소개·주요 제품·타깃 고객·필요 지원·보유 인증)을 AI가 다듬어 채웁니다. 기존 값이 더 구체적인 항목은 유지됩니다. 진행할까요?")) return;
+  const btn=document.getElementById("apply-learn-btn");
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 프로필 작성 중…'; }
+  try{
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[학습된 문서 종합]\n"+JSON.stringify(d)+"\n\n학습 내용을 반영해 프로필 항목을 개선해라. 반드시 JSON만 출력: {\"descr\":\"사업 소개 3~4문장\",\"products\":\"주요 제품·서비스 한 줄\",\"target\":\"타깃 고객 한 줄\",\"needs\":\"필요한 지원 유형 한 줄\",\"certs\":\"보유 인증·특허 한 줄(문서에 근거 있을 때만, 없으면 빈 문자열)\"} 기존 값이 이미 더 구체적이면 그 값을 유지해서 출력."}],900);
+    const mm=raw.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
+    const r=JSON.parse(mm?mm[0]:raw);
+    if(r.descr) PROFILE.descr=r.descr;
+    PROFILE.extra=PROFILE.extra||{};
+    if(r.products) PROFILE.extra.products=r.products;
+    if(r.target) PROFILE.extra.target=r.target;
+    if(r.needs) PROFILE.extra.needs=r.needs;
+    if(r.certs) PROFILE.extra.certs=r.certs;
+    delete PROFILE.extra.aiscore;
+    await saveProfileRemote(); rescoreAll(); fillProfileForm(); setTimeout(aiRerank,600);
+    const m=document.getElementById("p-save-msg"); if(m){ m.textContent="학습 내용이 프로필에 반영되었습니다 ✓"; setTimeout(function(){m.textContent="";},4000); }
+  }catch(e){ alert("프로필 업데이트에 실패했습니다. 잠시 후 다시 시도해 주세요."); }
+  if(btn){ btn.disabled=false; btn.textContent="학습 내용으로 프로필 자동 업데이트"; }
+}
+
+/* ══ 지원 시작 (스크랩 + 관리 드로어) ══ */
+async function startApply(idx){
+  const a=ANNS[idx];
+  if(scraps[a.key]===undefined) await toggleScrap(idx);
+  openApply(idx);
+}
+
+/* ══ 캘린더: 하루치 전체 목록 ══ */
+function showDayAll(y,m,d){
+  const matchedKeys=new Set(matchedList().map(function(x){return x.key;}));
+  const evs=ANNS.map(function(a,i){return {a:a,i:i};}).filter(function(o){
+    var a=o.a;
+    return a.deadlineDate&&a.deadlineDate.getFullYear()===y&&a.deadlineDate.getMonth()===m&&a.deadlineDate.getDate()===d&&(calMode==="all"||scraps[a.key]!==undefined||matchedKeys.has(a.key));
+  }).sort(function(x1,x2){return x2.a.score-x1.a.score;});
+  document.getElementById("guide-title").textContent=(m+1)+"월 "+d+"일 마감 공고 · "+evs.length+"건";
+  document.getElementById("guide-body").innerHTML=evs.map(function(o){
+    return '<div style="padding:11px 0;border-bottom:1px solid var(--line-soft);"><button style="background:none;border:none;padding:0;font-weight:700;font-size:13.5px;text-align:left;color:inherit;line-height:1.5;cursor:pointer;" onclick="openDetail('+o.i+')">'+esc(o.a.title)+'</button><div style="font-size:11.5px;color:var(--ink-faint);margin-top:3px;">'+esc(o.a.source)+' · 적합도 '+o.a.score+(scraps[o.a.key]!==undefined?' · ★ 스크랩됨':'')+'</div></div>';
+  }).join("")||'<p class="mini-note">해당 날짜의 공고가 없습니다.</p>';
+  document.getElementById("draft-btn").classList.add("hidden");
+  document.getElementById("guide-drawer").classList.add("open");
+  document.getElementById("chat-drawer").classList.remove("open");
+  document.getElementById("apply-drawer").classList.remove("open");
+  document.getElementById("overlay").classList.add("open");
+}
+
+/* ══ 성장 로드맵 + 인증·제도 AI 가이드 ══ */
+const CERTS=["벤처기업확인","기업부설연구소","연구전담부서","이노비즈(기술혁신형)","메인비즈(경영혁신형)","기술보증기금 보증","GS인증(SW품질)","ISO 9001","직무발명보상제도","특허·지식재산 전략","TIPS 프로그램","수출 준비(내수→수출)"];
+function renderCertChips(){
+  const el=document.getElementById("cert-chips"); if(!el)return;
+  const saved=(PROFILE.extra&&PROFILE.extra.certGuides)||{};
+  el.innerHTML=CERTS.map(function(c){
+    return '<button class="tab '+(saved[c]?"active":"")+'" onclick="certGuide(\''+c+'\')">'+(saved[c]?"✓ ":"")+c+'</button>';
+  }).join("");
+}
+function showRoadmap(){
+  renderCertChips();
+  const ex=PROFILE.extra||{};
+  const body=document.getElementById("roadmap-body");
+  const at=document.getElementById("roadmap-at");
+  if(ex.roadmap&&ex.roadmap.text){ body.innerHTML=mdRich(ex.roadmap.text); if(at)at.textContent=ex.roadmap.at?("생성: "+ex.roadmap.at):""; }
+}
+async function genRoadmap(force){
+  const body=document.getElementById("roadmap-body");
+  const btn=document.getElementById("roadmap-btn");
+  const ex=PROFILE.extra||{};
+  if(!force&&ex.roadmap&&ex.roadmap.text){ showRoadmap(); return; }
+  if(!PROFILE.company){ body.innerHTML='<div class="err-box">먼저 사업 프로필을 등록해 주세요. 프로필이 자세할수록 로드맵이 정확해집니다.</div>'; return; }
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 로드맵 설계 중…';
+  try{
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n너는 한국 중소기업 성장 컨설턴트다. 위 회사의 업종·업력·매출·인력·보유 인증 상태를 바탕으로 기업 성장 로드맵을 작성해라. 반드시 실제 한국 제도(벤처기업확인, 기업부설연구소/연구전담부서, 이노비즈, 메인비즈, 기술보증기금, GS인증, ISO, 직무발명보상, TIPS, 수출바우처 등) 기준으로. 형식(마크다운, 각 섹션 항목은 반드시 - 불릿):\n## 현재 단계 진단 — 3문장\n## 올해 반드시 준비할 것 TOP 3 — 각 항목: 제도명 / 왜 지금인지 / 핵심 요건 / 예상 소요기간\n## 1~2년 내 준비 목록 — 불릿 4~6개 (제도명 + 한 줄 이유)\n## 지원사업과의 연결 — 이 인증·제도들이 정부지원사업 가점·자격과 어떻게 연결되는지 3~4문장\n1000자 내외. 확실하지 않은 요건은 해당 기관 확인 권고."}],1800);
+    PROFILE.extra=PROFILE.extra||{};
+    PROFILE.extra.roadmap={text:raw,at:fmtDate(new Date())};
+    await saveProfileRemote();
+    showRoadmap();
+  }catch(e){ body.innerHTML=claudeErrHtml(e); }
+  btn.disabled=false; btn.textContent="AI 로드맵 생성 / 다시 생성";
+}
+async function certGuide(name){
+  PROFILE.extra=PROFILE.extra||{}; PROFILE.extra.certGuides=PROFILE.extra.certGuides||{};
+  const cached=PROFILE.extra.certGuides[name];
+  document.getElementById("guide-title").textContent=name+" — AI 실행 가이드";
+  const gb=document.getElementById("guide-body");
+  document.getElementById("draft-btn").classList.add("hidden");
+  document.getElementById("guide-drawer").classList.add("open");
+  document.getElementById("chat-drawer").classList.remove("open");
+  document.getElementById("apply-drawer").classList.remove("open");
+  document.getElementById("overlay").classList.add("open");
+  if(cached&&cached.text){
+    gb.innerHTML=mdRich(cached.text)+'<p class="mini-note" style="margin-top:14px;">생성: '+esc(cached.at||"")+' · <button style="background:none;border:none;color:var(--navy);font-weight:700;font-size:11.5px;cursor:pointer;text-decoration:underline;" onclick="certGuideRegen(\''+name+'\')">최신 정보로 다시 생성</button></p>';
+    return;
+  }
+  gb.innerHTML='<p style="color:var(--ink-soft);"><span class="spinner dark"></span> '+esc(name)+' 가이드를 우리 회사 기준으로 작성하고 있습니다…</p>';
+  try{
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n"+name+"에 대해 위 회사 기준의 실행 가이드를 작성해라. 형식(마크다운, 항목은 반드시 - 불릿):\n## 개요와 혜택 — 이 회사에 주는 실익 포함 (지원사업 가점·세제·보증 등)\n## 신청 자격·요건 — 우리 회사의 충족 가능성도 언급\n## 절차와 준비 서류 — 단계별로\n## 기간과 비용 — 현실적인 수치\n## 우리 회사 맞춤 팁 — 2~3개\n800자 내외. 확실하지 않은 요건·수수료는 해당 기관 확인을 권고."}],1500);
+    PROFILE.extra.certGuides[name]={text:raw,at:fmtDate(new Date())};
+    await saveProfileRemote();
+    gb.innerHTML=mdRich(raw)+'<p class="mini-note" style="margin-top:14px;">이 가이드는 계정에 저장되었습니다.</p>';
+    renderCertChips();
+  }catch(e){ gb.innerHTML=claudeErrHtml(e); }
+}
+function certGuideRegen(name){
+  if(PROFILE.extra&&PROFILE.extra.certGuides) delete PROFILE.extra.certGuides[name];
+  certGuide(name);
 }
 
 /* ══ 드로어 공통 ══ */
