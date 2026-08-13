@@ -3,6 +3,8 @@
 //   KSTARTUP_API_KEY  : 공공데이터포털 인증키 (K-Startup 조회서비스)
 //   BIZINFO_API_KEY   : 중소벤처24 인증키(token) — smes.go.kr 데이터 개방에서 발급
 //   BIZINFO_GOKR_KEY  : 기업마당(bizinfo.go.kr) 지원사업정보 API 인증키 — 발급 시 자동 연동
+//   MSIT_API_KEY      : 과기부 R&D 사업공고(1721000/msitannouncementinfo) 인증키
+//                       (공공데이터포털 일반 인증키 — K-Startup 키와 값이 같아도 별도 등록해야 동작)
 // ?fresh=1 을 붙이면 캐시를 무시하고 새로 수집합니다.
 
 let cache = { at: 0, payload: null }; // 약 3시간 캐시
@@ -23,6 +25,14 @@ function yyyymmdd(d) {
 }
 function findArray(json) {
   if (Array.isArray(json)) return json;
+  try {
+    const it = json.response && json.response.body && json.response.body.items;
+    if (it) {
+      if (Array.isArray(it)) return it;
+      if (Array.isArray(it.item)) return it.item;
+      if (it.item && typeof it.item === "object") return [it.item];
+    }
+  } catch (e) {}
   for (const k of Object.keys(json)) {
     const v = json[k];
     if (Array.isArray(v) && v.length && typeof v[0] === "object") return v;
@@ -83,6 +93,47 @@ async function fetchBizinfoGokr(key) {
     };
   }).filter(Boolean);
   return { items: items, note: items.length ? "" : "응답은 정상이나 공고 0건" };
+}
+
+/* ── 과기부 R&D 사업공고 (apis.data.go.kr/1721000/msitannouncementinfo) ── */
+async function fetchMsit(key) {
+  const base = "https://apis.data.go.kr/1721000/msitannouncementinfo";
+  const paths = ["/getAnnouncementInfo", "/getMsitAnnouncementInfo", "/getAnnouncementList", "/announcementInfo", ""];
+  const token = key.indexOf("%") >= 0 ? key : encodeURIComponent(key);
+  let lastNote = "";
+  for (const p of paths) {
+    try {
+      const url = base + p + "?serviceKey=" + token + "&pageNo=1&numOfRows=100&type=json&resultType=json&returnType=json";
+      const r = await fetch(url, { headers: { accept: "application/json" } });
+      const raw = await r.text();
+      let json;
+      try { json = JSON.parse(raw); }
+      catch (e) { lastNote = p + " → JSON 아님(HTTP " + r.status + "): " + raw.replace(/\s+/g, " ").slice(0, 100); continue; }
+      const list = findArray(json);
+      if (!list || !list.length) { lastNote = p + " → " + JSON.stringify(json).replace(/\s+/g, " ").slice(0, 140); continue; }
+      const fields = Object.keys(list[0] || {}).join(",").slice(0, 300);
+      const items = list.map((it) => {
+        const title = stripHtml(pick(it, ["title", "subject", "sj", "anncmntTtl", "pblancNm", "bsnsNm", "announcementTitle", "ttl"]));
+        if (!title) return null;
+        let link = pick(it, ["detailUrl", "dtlUrl", "detailPageUrl", "pageUrl", "url", "link", "hmpgUrl"]);
+        const dept = stripHtml(pick(it, ["deptNm", "chargerDeptNm", "chrgDeptNm", "department", "jrsdInsttNm"]));
+        const reg = pick(it, ["regDt", "registDt", "pblancDt", "noticeDt", "writeDt", "rgstDt", "cretDt", "reqstDt", "regDate"]);
+        return {
+          key: "ms-" + (pick(it, ["sn", "seq", "id", "anncmntSn", "no"]) || link || title).slice(0, 110),
+          title: title,
+          field: "기술·R&D",
+          agency: "과학기술정보통신부" + (dept ? " " + dept : ""),
+          period: stripHtml(pick(it, ["rcptPd", "reqstPd", "period", "applyPd"])),
+          registered: ymd(reg),
+          summary: stripHtml(pick(it, ["cn", "cntnts", "content", "sumry", "bsnsSumryCn"])).slice(0, 300),
+          url: link || "https://www.msit.go.kr",
+          source: "과기부 R&D"
+        };
+      }).filter(Boolean);
+      return { items: items, note: "", fields: fields, path: p };
+    } catch (e) { lastNote = p + " → " + String(e && e.message ? e.message : e).slice(0, 80); }
+  }
+  return { items: [], note: "호출 경로를 찾지 못함 · 마지막 시도: " + lastNote };
 }
 
 /* ── 중소벤처24 공고정보 (portal.smes.go.kr/ione-gw/api/pblanc/list) ── */
@@ -170,6 +221,7 @@ module.exports = async (req, res) => {
   const smesKey = process.env.BIZINFO_API_KEY;
   const ksKey = process.env.KSTARTUP_API_KEY;
   const bizKey = process.env.BIZINFO_GOKR_KEY;
+  const msitKey = process.env.MSIT_API_KEY; // 과기부 전용 환경변수 (등록된 경우에만 수집)
   if (!smesKey && !ksKey && !bizKey) return res.status(200).json({ source: "seed", reason: "no_key", items: [] });
 
   const fresh = req.url && req.url.indexOf("fresh=1") >= 0;
@@ -183,16 +235,19 @@ module.exports = async (req, res) => {
   const results = await Promise.allSettled([
     smesKey ? fetchSmes(smesKey) : Promise.resolve({ items: [], note: "키 없음" }),
     ksKey ? fetchKstartup(ksKey) : Promise.resolve([]),
-    bizKey ? fetchBizinfoGokr(bizKey) : Promise.resolve({ items: [], note: "키 없음" })
+    bizKey ? fetchBizinfoGokr(bizKey) : Promise.resolve({ items: [], note: "키 없음" }),
+    msitKey ? fetchMsit(msitKey) : Promise.resolve({ items: [], note: "키 없음" })
   ]);
   const smRes = results[0].status === "fulfilled" ? results[0].value : { items: [], note: "호출 실패: " + String(results[0].reason).slice(0, 100) };
   const sm = smRes.items || [];
   const ks = results[1].status === "fulfilled" ? results[1].value : [];
   const bzRes = results[2].status === "fulfilled" ? results[2].value : { items: [], note: "호출 실패: " + String(results[2].reason).slice(0, 100) };
   const bz = bzRes.items || [];
+  const msRes = results[3].status === "fulfilled" ? results[3].value : { items: [], note: "호출 실패: " + String(results[3].reason).slice(0, 100) };
+  const ms = msRes.items || [];
 
   const map = new Map();
-  for (const it of [...ks, ...sm, ...bz]) {
+  for (const it of [...ks, ...sm, ...bz, ...ms]) {
     const norm = it.title.replace(/^\[[^\]]*\]\s*/, "").replace(/\s+/g, "").slice(0, 40);
     if (map.has(norm)) { map.get(norm).dual = true; continue; }
     map.set(norm, it);
@@ -209,14 +264,19 @@ module.exports = async (req, res) => {
   if (ks.length) parts.push("kstartup");
   if (sm.length) parts.push("smes24");
   if (bz.length) parts.push("bizinfo");
+  if (ms.length) parts.push("msit");
   const payload = {
     source: parts.join("+") || "seed",
     count: items.length,
     kstartup_count: ks.length,
     smes24_count: sm.length,
     bizinfo_count: bz.length,
+    msit_count: ms.length,
     smes24_note: smRes.note || "",
     bizinfo_note: bzRes.note || "",
+    msit_note: msRes.note || "",
+    msit_fields: msRes.fields || "",
+    msit_path: msRes.path || "",
     items
   };
   cache = { at: Date.now(), payload };
