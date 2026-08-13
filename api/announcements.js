@@ -44,11 +44,16 @@ function findArray(json) {
   }
   return null;
 }
+function cleanVal(v) {
+  const s = String(v == null ? "" : v).trim();
+  return (s === "" || /^(null|undefined|none|-)$/i.test(s)) ? "" : s;
+}
 function pick(it, keys) {
   for (const k of keys) {
-    if (it[k] !== undefined && it[k] !== null && String(it[k]).trim() !== "") return String(it[k]);
+    let v = cleanVal(it[k]);
+    if (v) return v;
     const lk = Object.keys(it).find((x) => x.toLowerCase() === k.toLowerCase());
-    if (lk && String(it[lk]).trim() !== "") return String(it[lk]);
+    if (lk) { v = cleanVal(it[lk]); if (v) return v; }
   }
   return "";
 }
@@ -97,49 +102,57 @@ async function fetchBizinfoGokr(key) {
 
 /* ── 과기부 R&D 사업공고 (apis.data.go.kr/1721000/msitannouncementinfo) ── */
 async function fetchMsit(key) {
-  // 공식 가이드: businessAnnouncMentList / numOfRows=10 고정 / returnType=json
-  // 데이터가 오래된 순으로 정렬된 경우를 대비해 totalCount 기준 마지막 페이지(최신)를 수집
+  // 공식 가이드의 기본 응답(XML)을 직접 파싱 — 문서 샘플과 1:1 구조
   const base = "https://apis.data.go.kr/1721000/msitannouncementinfo/businessAnnouncMentList";
   const token = key.indexOf("%") >= 0 ? key : encodeURIComponent(key);
-  const call = async (p) => {
-    const r = await fetch(base + "?serviceKey=" + token + "&numOfRows=10&pageNo=" + p + "&returnType=json", { headers: { accept: "application/json" } });
-    const raw = await r.text();
-    let json; try { json = JSON.parse(raw); } catch (e) { return { err: "JSON 아님(HTTP " + r.status + "): " + raw.replace(/\s+/g, " ").slice(0, 100) }; }
-    const hdr = json.response && json.response.header;
-    if (hdr && hdr.resultCode && hdr.resultCode !== "00") return { err: "서버 코드 " + hdr.resultCode + ": " + (hdr.resultMsg || "") };
-    const body = json.response && json.response.body;
-    return { list: findArray(json) || [], total: body ? parseInt(body.totalCount, 10) || 0 : 0 };
+  const tag = (block, name) => {
+    const m = block.match(new RegExp("<" + name + ">([\\s\\S]*?)</" + name + ">"));
+    return m ? m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim() : "";
   };
-  let note = "";
-  const first = await call(1);
+  const callPage = async (p) => {
+    const r = await fetch(base + "?serviceKey=" + token + "&numOfRows=10&pageNo=" + p, { headers: { accept: "application/xml" } });
+    const raw = await r.text();
+    if (raw.indexOf("<") < 0) return { err: "XML 아님(HTTP " + r.status + "): " + raw.slice(0, 100) };
+    if (/NO_OPENAPI|SERVICE_KEY_IS|SERVICE ERROR/i.test(raw)) return { err: raw.replace(/\s+/g, " ").slice(0, 150) };
+    const code = tag(raw, "resultCode");
+    if (code && code !== "00") return { err: "서버 코드 " + code + ": " + tag(raw, "resultMsg") };
+    const blocks = [];
+    const re = /<item>([\s\S]*?)<\/item>/g;
+    let m;
+    while ((m = re.exec(raw)) !== null) blocks.push(m[1]);
+    return { blocks: blocks, total: parseInt(tag(raw, "totalCount"), 10) || 0 };
+  };
+  const first = await callPage(1);
   if (first.err) return { items: [], note: first.err };
-  const all = (first.list || []).slice();
+  let blocks = (first.blocks || []).slice();
   const total = first.total || 0;
   const lastPage = Math.max(1, Math.ceil(total / 10));
   const pages = [];
-  for (let p = lastPage; p > Math.max(1, lastPage - 5); p--) pages.push(p); // 마지막 5페이지(최신 후보)
-  const results = await Promise.allSettled(pages.map(call));
+  for (let p = lastPage; p > Math.max(1, lastPage - 5) && p > 1; p--) pages.push(p); // 최신이 뒤쪽 정렬일 경우 대비
+  let note = "";
+  const results = await Promise.allSettled(pages.map(callPage));
   for (const rr of results) {
-    if (rr.status === "fulfilled" && rr.value.list) { for (const it of rr.value.list) all.push(it); }
+    if (rr.status === "fulfilled" && rr.value.blocks) blocks = blocks.concat(rr.value.blocks);
     else if (rr.status === "fulfilled" && rr.value.err) note = rr.value.err;
   }
   const cutoff = yyyymmdd(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000));
   let maxPress = "";
   const seenMs = new Set();
-  const items = all.map((it) => {
-    const title = stripHtml(it.subject || "");
+  const items = blocks.map((b) => {
+    const title = stripHtml(tag(b, "subject"));
     if (!title) return null;
-    const press = String(it.pressDt || "").replace(/[^0-9]/g, "").slice(0, 8);
+    const press = tag(b, "pressDt").replace(/[^0-9]/g, "").slice(0, 8);
     if (press > maxPress) maxPress = press;
     if (press && press < cutoff) return null;
-    const url = it.viewUrl || "https://www.msit.go.kr";
+    const url = tag(b, "viewUrl").replace(/&amp;/g, "&") || "https://www.msit.go.kr";
     const k = "ms-" + String(url || title).slice(-80);
     if (seenMs.has(k)) return null;
     seenMs.add(k);
-    const contact = [it.deptName, it.managerName, it.managerTel].map(stripHtml).filter(Boolean).join(" · ");
+    const dept = stripHtml(tag(b, "deptName"));
+    const contact = [dept, stripHtml(tag(b, "managerName")), stripHtml(tag(b, "managerTel"))].filter(Boolean).join(" · ");
     return {
       key: k, title: title, field: "기술·R&D",
-      agency: "과학기술정보통신부" + (it.deptName ? " " + stripHtml(it.deptName) : ""),
+      agency: "과학기술정보통신부" + (dept ? " " + dept : ""),
       period: "", registered: ymd(press),
       summary: (contact ? "담당: " + contact + " — " : "") + "접수기간·자격요건은 원문 공고를 확인하세요.",
       url: url, source: "과기부 R&D"
@@ -147,9 +160,9 @@ async function fetchMsit(key) {
   }).filter(Boolean).sort((a, b) => String(b.registered).localeCompare(String(a.registered))).slice(0, 60);
   return {
     items: items,
-    note: items.length ? "" : (note || ("수집 " + all.length + "건 중 최근 90일 게시분 없음 · 확인된 최신 게시일: " + (maxPress ? ymd(maxPress) : "없음") + " · totalCount: " + total)),
-    fields: "subject,viewUrl,deptName,managerName,managerTel,pressDt",
-    path: "/businessAnnouncMentList(p1+last5)"
+    note: items.length ? "" : ("XML " + blocks.length + "건 파싱 · 최신 게시일 " + (maxPress ? ymd(maxPress) : "없음") + " · total " + total + " · 샘플: " + String(blocks[0] || "").replace(/\s+/g, " ").slice(0, 150) + (note ? " · " + note : "")),
+    fields: "subject,viewUrl,deptName,managerName,managerTel,pressDt (XML)",
+    path: "/businessAnnouncMentList xml p1+last5"
   };
 }
 
