@@ -97,43 +97,51 @@ async function fetchBizinfoGokr(key) {
 
 /* ── 과기부 R&D 사업공고 (apis.data.go.kr/1721000/msitannouncementinfo) ── */
 async function fetchMsit(key) {
-  const base = "https://apis.data.go.kr/1721000/msitannouncementinfo";
-  const paths = ["/businessAnnouncMentList", "/getAnnouncementInfo", "/getAnnouncementList", ""];
+  // 공식 가이드(v1.0) 기준: businessAnnouncMentList / numOfRows=10 고정 / returnType=json / 응답: subject, viewUrl, deptName, managerName, managerTel, pressDt
+  const base = "https://apis.data.go.kr/1721000/msitannouncementinfo/businessAnnouncMentList";
   const token = key.indexOf("%") >= 0 ? key : encodeURIComponent(key);
-  let lastNote = "";
-  for (const p of paths) {
-    try {
-      const url = base + p + "?serviceKey=" + token + "&pageNo=1&numOfRows=100&type=json&resultType=json&returnType=json";
-      const r = await fetch(url, { headers: { accept: "application/json" } });
-      const raw = await r.text();
-      let json;
-      try { json = JSON.parse(raw); }
-      catch (e) { lastNote = p + " → JSON 아님(HTTP " + r.status + "): " + raw.replace(/\s+/g, " ").slice(0, 100); continue; }
-      const list = findArray(json);
-      if (!list || !list.length) { lastNote = p + " → " + JSON.stringify(json).replace(/\s+/g, " ").slice(0, 140); continue; }
-      const fields = Object.keys(list[0] || {}).join(",").slice(0, 300);
-      const items = list.map((it) => {
-        const title = stripHtml(pick(it, ["title", "subject", "sj", "anncmntTtl", "pblancNm", "bsnsNm", "announcementTitle", "ttl"]));
-        if (!title) return null;
-        let link = pick(it, ["detailUrl", "dtlUrl", "detailPageUrl", "pageUrl", "url", "link", "hmpgUrl"]);
-        const dept = stripHtml(pick(it, ["deptNm", "chargerDeptNm", "chrgDeptNm", "department", "jrsdInsttNm"]));
-        const reg = pick(it, ["regDt", "registDt", "pblancDt", "noticeDt", "writeDt", "rgstDt", "cretDt", "reqstDt", "regDate"]);
-        return {
-          key: "ms-" + (pick(it, ["sn", "seq", "id", "anncmntSn", "no"]) || link || title).slice(0, 110),
-          title: title,
-          field: "기술·R&D",
-          agency: "과학기술정보통신부" + (dept ? " " + dept : ""),
-          period: stripHtml(pick(it, ["rcptPd", "reqstPd", "period", "applyPd"])),
-          registered: ymd(reg),
-          summary: stripHtml(pick(it, ["cn", "cntnts", "content", "sumry", "bsnsSumryCn"])).slice(0, 300),
-          url: link || "https://www.msit.go.kr",
-          source: "과기부 R&D"
-        };
-      }).filter(Boolean);
-      return { items: items, note: "", fields: fields, path: p };
-    } catch (e) { lastNote = p + " → " + String(e && e.message ? e.message : e).slice(0, 80); }
+  const pages = [1, 2, 3, 4, 5]; // 최신순 50건 수집
+  let note = "";
+  const results = await Promise.allSettled(pages.map((p) =>
+    fetch(base + "?serviceKey=" + token + "&numOfRows=10&pageNo=" + p + "&returnType=json", { headers: { accept: "application/json" } }).then((r) => r.text())
+  ));
+  const all = [];
+  for (const rr of results) {
+    if (rr.status !== "fulfilled") { note = "호출 실패: " + String(rr.reason).slice(0, 80); continue; }
+    let json;
+    try { json = JSON.parse(rr.value); }
+    catch (e) { note = "JSON 아님: " + String(rr.value).replace(/\s+/g, " ").slice(0, 120); continue; }
+    const hdr = json.response && json.response.header;
+    if (hdr && hdr.resultCode && hdr.resultCode !== "00") { note = "서버 코드 " + hdr.resultCode + ": " + (hdr.resultMsg || ""); continue; }
+    const list = findArray(json);
+    if (!list) { note = "응답: " + JSON.stringify(json).replace(/\s+/g, " ").slice(0, 140); continue; }
+    for (const it of list) all.push(it);
   }
-  return { items: [], note: "호출 경로를 찾지 못함 · 마지막 시도: " + lastNote };
+  const cutoff = yyyymmdd(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)); // 최근 90일 게시분만
+  const seenMs = new Set();
+  const items = all.map((it) => {
+    const title = stripHtml(it.subject || "");
+    if (!title) return null;
+    const press = String(it.pressDt || "").replace(/[^0-9]/g, "").slice(0, 8);
+    if (press && press < cutoff) return null;
+    const url = it.viewUrl || "https://www.msit.go.kr";
+    const k = "ms-" + String(url || title).slice(-80);
+    if (seenMs.has(k)) return null;
+    seenMs.add(k);
+    const contact = [it.deptName, it.managerName, it.managerTel].map(stripHtml).filter(Boolean).join(" · ");
+    return {
+      key: k,
+      title: title,
+      field: "기술·R&D",
+      agency: "과학기술정보통신부" + (it.deptName ? " " + stripHtml(it.deptName) : ""),
+      period: "",
+      registered: ymd(press),
+      summary: (contact ? "담당: " + contact + " — " : "") + "접수기간·자격요건은 원문 공고를 확인하세요.",
+      url: url,
+      source: "과기부 R&D"
+    };
+  }).filter(Boolean);
+  return { items: items, note: items.length ? "" : (note || "최근 90일 게시 공고 없음"), fields: "subject,viewUrl,deptName,managerName,managerTel,pressDt", path: "/businessAnnouncMentList" };
 }
 
 /* ── 중소벤처24 공고정보 (portal.smes.go.kr/ione-gw/api/pblanc/list) ── */
