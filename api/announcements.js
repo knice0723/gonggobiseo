@@ -127,8 +127,10 @@ async function fetchMsit(key) {
   let blocks = (first.blocks || []).slice();
   const total = first.total || 0;
   const lastPage = Math.max(1, Math.ceil(total / 10));
+  // 실측 결과 최신순 정렬 확인 → 앞쪽 페이지(2~6) 위주로 수집, 뒤쪽 1페이지는 역정렬 대비 보험
   const pages = [];
-  for (let p = lastPage; p > Math.max(1, lastPage - 5) && p > 1; p--) pages.push(p); // 최신이 뒤쪽 정렬일 경우 대비
+  for (let p = 2; p <= Math.min(6, lastPage); p++) pages.push(p);
+  if (lastPage > 6) pages.push(lastPage);
   let note = "";
   const results = await Promise.allSettled(pages.map(callPage));
   for (const rr of results) {
