@@ -1,7 +1,8 @@
-// 지원사업 공고 수집 API — 중소벤처24 + K-Startup 통합판
+// 지원사업 공고 수집 API — K-Startup + 중소벤처24 + 기업마당 통합판
 // 환경변수:
-//   BIZINFO_API_KEY   : 중소벤처24 인증키(token) — smes.go.kr 데이터 개방에서 발급받은 키
 //   KSTARTUP_API_KEY  : 공공데이터포털 인증키 (K-Startup 조회서비스)
+//   BIZINFO_API_KEY   : 중소벤처24 인증키(token) — smes.go.kr 데이터 개방에서 발급
+//   BIZINFO_GOKR_KEY  : 기업마당(bizinfo.go.kr) 지원사업정보 API 인증키 — 발급 시 자동 연동
 // ?fresh=1 을 붙이면 캐시를 무시하고 새로 수집합니다.
 
 let cache = { at: 0, payload: null }; // 약 3시간 캐시
@@ -48,6 +49,40 @@ function pickDateByPattern(it, pattern) {
     if (v.length >= 8) return v.slice(0, 8);
   }
   return "";
+}
+
+/* ── 기업마당 지원사업정보 (bizinfo.go.kr/uss/rss/bizinfoApi.do) ── */
+async function fetchBizinfoGokr(key) {
+  const url = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do?crtfcKey=" +
+    (key.indexOf("%") >= 0 ? key : encodeURIComponent(key)) + "&dataType=json&searchCnt=150";
+  const r = await fetch(url, { headers: { accept: "application/json" } });
+  const raw = await r.text();
+  let json;
+  try { json = JSON.parse(raw); }
+  catch (e) { return { items: [], note: "응답이 JSON이 아님 · HTTP " + r.status + " · " + raw.replace(/\s+/g, " ").slice(0, 120) }; }
+  const list = findArray(json);
+  if (!list) return { items: [], note: "기업마당 서버 응답: " + JSON.stringify(json).replace(/\s+/g, " ").slice(0, 200) };
+  const items = list.map((it) => {
+    const title = stripHtml(pick(it, ["pblancNm", "pblancnm", "title"]));
+    if (!title) return null;
+    let link = pick(it, ["pblancUrl", "pblancurl", "link"]);
+    if (link && link.startsWith("/")) link = "https://www.bizinfo.go.kr" + link;
+    const period = stripHtml(pick(it, ["reqstBeginEndDe", "reqstbeginendde"]));
+    const eNums = String(period).replace(/[^0-9]/g, "");
+    if (eNums.length >= 16 && eNums.slice(8, 16) < yyyymmdd(new Date())) return null; // 마감 지난 공고 제외
+    return {
+      key: "bz-" + (pick(it, ["pblancId", "pblancid"]) || link || title).slice(0, 110),
+      title: title,
+      field: stripHtml(pick(it, ["pldirSportRealmLclasCodeNm", "pldirsportrealmlclascodenm"])) || "기타",
+      agency: stripHtml(pick(it, ["jrsdInsttNm", "jrsdinsttnm", "excInsttNm", "excinsttnm"])) || "기업마당",
+      period: period,
+      registered: stripHtml(pick(it, ["creatPnttm", "creatpnttm"])).slice(0, 10).replace(/-/g, "."),
+      summary: stripHtml(pick(it, ["bsnsSumryCn", "bsnssumrycn"])).slice(0, 300),
+      url: link || "https://www.bizinfo.go.kr",
+      source: "기업마당"
+    };
+  }).filter(Boolean);
+  return { items: items, note: items.length ? "" : "응답은 정상이나 공고 0건" };
 }
 
 /* ── 중소벤처24 공고정보 (portal.smes.go.kr/ione-gw/api/pblanc/list) ── */
@@ -134,7 +169,8 @@ module.exports = async (req, res) => {
 
   const smesKey = process.env.BIZINFO_API_KEY;
   const ksKey = process.env.KSTARTUP_API_KEY;
-  if (!smesKey && !ksKey) return res.status(200).json({ source: "seed", reason: "no_key", items: [] });
+  const bizKey = process.env.BIZINFO_GOKR_KEY;
+  if (!smesKey && !ksKey && !bizKey) return res.status(200).json({ source: "seed", reason: "no_key", items: [] });
 
   const fresh = req.url && req.url.indexOf("fresh=1") >= 0;
   const lmm = req.url && req.url.match(/limit=(\d+)/);
@@ -146,14 +182,17 @@ module.exports = async (req, res) => {
 
   const results = await Promise.allSettled([
     smesKey ? fetchSmes(smesKey) : Promise.resolve({ items: [], note: "키 없음" }),
-    ksKey ? fetchKstartup(ksKey) : Promise.resolve([])
+    ksKey ? fetchKstartup(ksKey) : Promise.resolve([]),
+    bizKey ? fetchBizinfoGokr(bizKey) : Promise.resolve({ items: [], note: "키 없음" })
   ]);
   const smRes = results[0].status === "fulfilled" ? results[0].value : { items: [], note: "호출 실패: " + String(results[0].reason).slice(0, 100) };
   const sm = smRes.items || [];
   const ks = results[1].status === "fulfilled" ? results[1].value : [];
+  const bzRes = results[2].status === "fulfilled" ? results[2].value : { items: [], note: "호출 실패: " + String(results[2].reason).slice(0, 100) };
+  const bz = bzRes.items || [];
 
   const map = new Map();
-  for (const it of [...ks, ...sm]) {
+  for (const it of [...ks, ...sm, ...bz]) {
     const norm = it.title.replace(/^\[[^\]]*\]\s*/, "").replace(/\s+/g, "").slice(0, 40);
     if (map.has(norm)) { map.get(norm).dual = true; continue; }
     map.set(norm, it);
@@ -163,16 +202,21 @@ module.exports = async (req, res) => {
   if (items.length > 800) items = items.slice(0, 800);
 
   if (!items.length) {
-    return res.status(200).json({ source: "seed", reason: "all_failed", smes24_note: smRes.note || "", items: [] });
+    return res.status(200).json({ source: "seed", reason: "all_failed", smes24_note: smRes.note || "", bizinfo_note: bzRes.note || "", items: [] });
   }
 
+  const parts = [];
+  if (ks.length) parts.push("kstartup");
+  if (sm.length) parts.push("smes24");
+  if (bz.length) parts.push("bizinfo");
   const payload = {
-    source: (sm.length && ks.length) ? "smes24+kstartup" : (ks.length ? "kstartup" : "smes24"),
+    source: parts.join("+") || "seed",
     count: items.length,
-    smes24_count: sm.length,
     kstartup_count: ks.length,
+    smes24_count: sm.length,
+    bizinfo_count: bz.length,
     smes24_note: smRes.note || "",
-    smes24_fields: smRes.fields || "",
+    bizinfo_note: bzRes.note || "",
     items
   };
   cache = { at: Date.now(), payload };
