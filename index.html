@@ -594,6 +594,11 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
       </div>
     </div>
 
+    <div id="view-applydetail" class="view">
+      <button class="btn" style="margin-bottom:14px;" onclick="go('scrap')">← 지원 현황으로</button>
+      <div id="applypage"></div>
+    </div>
+
     <div id="view-roadmap" class="view">
       <div class="page-head"><h1>기업 성장 로드맵</h1><p>사업 프로필과 학습된 문서를 바탕으로, 우리 회사가 연차·산업 특성에 맞춰 준비해야 할 인증·제도를 AI가 설계합니다. 인증은 정부지원사업의 가점·자격과 직결됩니다.</p></div>
       <div class="two-col">
@@ -604,9 +609,12 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
         </div>
         <div class="panel">
           <h3>인증·제도별 AI 가이드</h3>
-          <p style="font-size:12.5px;color:var(--ink-soft);margin-bottom:10px;line-height:1.6;">항목을 누르면 우리 회사 기준의 상세 가이드(혜택·요건·절차·서류·기간·팁)를 AI가 작성합니다. ✓ 표시는 이미 생성되어 저장된 가이드입니다.</p>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="cert-chips"></div>
-          <p class="mini-note">가이드는 계정에 저장되어 다시 열면 즉시 표시됩니다.</p>
+          <p style="font-size:12.5px;color:var(--ink-soft);margin-bottom:12px;line-height:1.6;">인증·세제·보증·조달·고용 등 44개 제도입니다. 항목을 누르면 우리 회사 기준의 상세 가이드(혜택 수치·요건·절차·기간·팁)를 AI가 작성합니다. ✓ = 저장된 가이드.</p>
+          <div id="cert-chips"></div>
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line-soft);">
+            <button class="btn btn-primary" id="cert-discover-btn" onclick="discoverCerts()">🔎 우리 회사 맞춤 숨은 제도 AI 발굴</button>
+            <p class="mini-note" style="margin-top:6px;">목록에 없는 업종 특화 제도·바우처·혜택을 AI가 프로필 기반으로 추가 발굴합니다.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -841,6 +849,10 @@ function scoreAnn(a){
     else { s-=28; warns.push("교육·행사성 공고"); }
   }
 
+  /* 6.5) 구조적 제약 감지 — 컨소시엄·지정품목·과제 공고는 원문 확인 전 고득점 금지 */
+  if(/컨소시엄|수요기업.{0,14}공급기업|공동\s*(신청|수행)|주관기관.{0,10}참여기관/.test(text)){ s-=10; warns.push("컨소시엄(공동 신청) 구성 필요"); }
+  if(/지정\s*품목|품목요구서|지정\s*과제|품목\s*지정|RFP/i.test(text)){ s-=8; warns.push("지정 품목·과제 한정 — 요구서 확인 필수"); }
+
   /* 7) 상한 규칙 — 근거 없는 고득점 차단 */
   if(titleHits.length===0){
     if(hitS.length>=3) s=Math.min(s,84);               // 본문에 핵심어가 여럿이면 허용
@@ -946,6 +958,7 @@ function pushNav(state){ try{ if(!navInit){ history.replaceState(state,"","#"+(s
 window.addEventListener("popstate",function(e){
   const s=e.state||{};
   if(s.v==="detail"&&typeof s.idx==="number"&&ANNS[s.idx]){ openDetail(s.idx,true); return; }
+  if(s.v==="apply"&&typeof s.idx==="number"&&ANNS[s.idx]){ openApply(s.idx,true); return; }
   if(s.v){ go(s.v,true); }
 });
 
@@ -1635,49 +1648,94 @@ async function loadAdmin(){
 }
 
 /* ══ 지원 관리 (제출 서류·발표·선정) ══ */
-let applyKey=null;
+let applyKey=null, applyIdx=null;
 function scrapOf(key){ if(!scraps[key]) scraps[key]={status:"검토 중",detail:{}}; if(!scraps[key].detail) scraps[key].detail={}; return scraps[key]; }
-function openApply(idx){
-  const a=ANNS[idx]; applyKey=a.key;
-  const sc=scrapOf(a.key), d=sc.detail;
-  d.applied=true; // 관리를 시작하면 지원 현황으로 편입
-  document.getElementById("apply-title").textContent=a.title.replace(/^\[[^\]]*\]\s*/,"").slice(0,40)+" — 지원 관리";
-  const up=function(kind,label,hint){
-    return '<div class="sec-title">'+label+'</div>'+(hint?'<p class="mini-note" style="margin:2px 0 6px;">'+hint+'</p>':'')+'<div id="ap-'+kind+'"></div>'+
-      (sb&&userId?'<input type="file" id="ap-file-'+kind+'" class="hidden" multiple onchange="apUpload(\''+kind+'\',this)"><button class="btn" style="margin-bottom:6px;" onclick="document.getElementById(\'ap-file-'+kind+'\').click()">+ 파일 올리기 (여러 개 선택 가능)</button>':'<p class="mini-note">파일 저장은 로그인 후 사용할 수 있습니다.</p>');
-  };
-  document.getElementById("apply-body").innerHTML=
-    '<div class="field"><label>진행 상태</label><select id="ap-status">'+STATUS.map(function(s){return '<option '+(s===sc.status?"selected":"")+'>'+s+'</option>';}).join("")+'</select><div class="hint">검토 중 → 작성 중 → 제출 완료 → 발표평가 → 최종 선정/미선정 → 수행 → 완료 순으로 관리하세요.</div></div>'+
-    ((a.attach&&a.attach.length)||a.url?'<div class="sec-title" style="margin-top:4px;">공고 자료 (원문·양식 내려받기)</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">'+
-      '<a class="btn" target="_blank" href="'+esc(a.url)+'">원문 공고 열기 ↗</a>'+
-      ((a.attach||[]).map(function(f){return '<a class="btn" style="font-size:12px;" target="_blank" href="'+esc(f.url)+'">📎 '+esc((f.name||"첨부").slice(0,26))+'</a>';}).join(""))+'</div>':"")+
-    up("subs","① 신청·서면평가 제출 서류","사업계획서, 신청서, 증빙 등")+
-    up("pts","② 발표평가 자료","발표 PPT, 시연 자료 등")+
-    up("post","③ 선정·협약 후 제출 서류","협약서, 사업자등록증, 통장사본, 보고서 등")+
-    '<div class="sec-title">선정·수행 정보</div>'+
-    '<div class="grid2">'+
-    '<div class="field"><label>수행기관·주관</label><input type="text" id="ap-agency" value="'+esc(d.agency||"")+'" placeholder="예: 서울창조경제혁신센터"></div>'+
-    '<div class="field"><label>협약 기간</label><input type="text" id="ap-period" value="'+esc(d.period||"")+'" placeholder="예: 2026.09 ~ 2027.08"></div>'+
-    '</div>'+
-    '<div class="field"><label>확정 지원금</label><input type="text" id="ap-fund" value="'+esc(d.fund||"")+'" placeholder="예: 7,000만 원"></div>'+
-    '<div class="field"><label>수행 일정 (협약·중간보고·최종보고·정산)</label><textarea id="ap-mile" rows="2" placeholder="예: 09.15 협약 / 12.20 중간보고 / 2027.06.30 최종보고·정산">'+esc(d.mile||"")+'</textarea></div>'+
-    '<div class="field"><label>메모 (미선정 사유·심사 피드백·담당자 등)</label><textarea id="ap-memo" rows="3" placeholder="예: 담당자 김OO 044-000-0000 / 미선정 피드백: 시장 검증 부족">'+esc(d.memo||"")+'</textarea></div>';
-  renderApplyFiles();
+function openApply(idx, fromPop){
+  const a=ANNS[idx]; applyKey=a.key; applyIdx=idx;
+  const sc=scrapOf(a.key); sc.detail.applied=true;
+  renderApplyPage();
+  document.querySelectorAll(".view").forEach(function(v){v.classList.remove("active");});
+  document.getElementById("view-applydetail").classList.add("active");
+  document.querySelectorAll(".nav-item").forEach(function(n){n.classList.toggle("active",n.dataset.nav==="scrap");});
+  currentView="applydetail"; closeDrawers(); window.scrollTo(0,0);
   saveApply(false);
-  document.getElementById("apply-drawer").classList.add("open");
-  document.getElementById("guide-drawer").classList.remove("open");
-  document.getElementById("chat-drawer").classList.remove("open");
-  document.getElementById("overlay").classList.add("open");
+  if(!fromPop) pushNav({v:"apply",idx:idx});
+}
+function renderApplyPage(){
+  const a=ANNS[applyIdx]; if(!a) return;
+  const sc=scrapOf(applyKey), d=sc.detail;
+  const el=document.getElementById("applypage");
+  function docSec(kind,label,hint){
+    return '<div class="panel" style="margin-bottom:14px;"><h3>'+label+'</h3><p class="mini-note" style="margin:0 0 10px;">'+hint+'</p><div id="ap-'+kind+'"></div>'+
+      (sb&&userId?'<input type="file" id="ap-file-'+kind+'" class="hidden" multiple onchange="apUpload(\''+kind+'\',this)"><button class="btn" style="margin-top:8px;" onclick="document.getElementById(\'ap-file-'+kind+'\').click()">+ 파일 올리기 (여러 개 선택 가능)</button>':'<p class="mini-note">파일 저장은 로그인 후 사용할 수 있습니다.</p>')+'</div>';
+  }
+  el.innerHTML=
+    '<div class="page-head" style="margin-bottom:14px;"><h1 style="font-size:22px;line-height:1.4;">'+esc(a.title)+'</h1><p>'+esc(a.source)+' · 마감 '+esc(a.deadlineText)+' · '+(a.dday===999?"상시":(a.dday<0?"마감":"D-"+a.dday))+' · 적합도 '+a.score+'</p></div>'+
+    '<div class="panel" style="margin-bottom:16px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">'+
+      '<div class="field" style="margin:0;min-width:200px;"><label>진행 상태</label><select id="ap-status" onchange="saveApply(false)">'+STATUS.map(function(s){return '<option '+(s===sc.status?"selected":"")+'>'+s+'</option>';}).join("")+'</select></div>'+
+      '<button class="btn btn-seal" onclick="saveApply(false)">저장</button>'+
+      '<span id="ap-save-msg" style="font-size:12.5px;color:var(--ink-soft);min-width:70px;"></span>'+
+      '<span style="flex:1;"></span>'+
+      '<button class="btn" onclick="openDetail('+applyIdx+')">공고 상세</button>'+
+      '<button class="btn" onclick="openGuide('+applyIdx+')">작성 가이드·초안</button>'+
+      '<button class="btn" style="color:var(--seal);" onclick="cancelApply()">지원 취소 → 스크랩</button>'+
+    '</div>'+
+    '<div class="content-grid" style="align-items:start;">'+
+      '<div>'+
+        docSec("subs","① 신청·서면평가 제출 서류","사업계획서, 신청서, 자격 증빙 등 — 파일별로 미리보기·다운로드할 수 있습니다")+
+        docSec("pts","② 발표평가 자료","발표 PPT, 시연 영상, 보충 자료 등")+
+        docSec("post","③ 선정·협약 후 제출 서류","협약서, 사업자등록증, 통장사본, 중간·최종보고서 등")+
+      '</div>'+
+      '<div>'+
+        (((a.attach&&a.attach.length)||a.url)?('<div class="panel" style="margin-bottom:14px;"><h3>공고 자료</h3><div style="display:flex;gap:6px;flex-wrap:wrap;">'+
+          '<a class="btn" target="_blank" href="'+esc(a.url)+'">원문 공고 ↗</a>'+
+          ((a.attach||[]).map(function(f){return '<a class="btn" style="font-size:12px;" target="_blank" href="'+esc(f.url)+'">📎 '+esc((f.name||"첨부").slice(0,24))+'</a>';}).join(""))+'</div></div>'):"")+
+        '<div class="panel" style="margin-bottom:14px;"><h3>선정·수행 정보</h3>'+
+          '<div class="field"><label>수행기관·주관</label><input type="text" id="ap-agency" value="'+esc(d.agency||"")+'" placeholder="예: 서울창조경제혁신센터"></div>'+
+          '<div class="field"><label>협약 기간</label><input type="text" id="ap-period" value="'+esc(d.period||"")+'" placeholder="예: 2026.09 ~ 2027.08"></div>'+
+          '<div class="field"><label>확정 지원금</label><input type="text" id="ap-fund" value="'+esc(d.fund||"")+'" placeholder="예: 7,000만 원"></div>'+
+          '<div class="field" style="margin-bottom:0;"><label>수행 일정 (협약·보고·정산)</label><textarea id="ap-mile" rows="2" placeholder="예: 09.15 협약 / 12.20 중간보고 / 2027.06.30 최종보고">'+esc(d.mile||"")+'</textarea></div>'+
+        '</div>'+
+        '<div class="panel"><h3>메모</h3><div class="field" style="margin:0;"><textarea id="ap-memo" rows="4" placeholder="담당자 연락처, 심사 피드백, 미선정 사유 등">'+esc(d.memo||"")+'</textarea></div></div>'+
+      '</div>'+
+    '</div>';
+  renderApplyFiles();
+}
+async function cancelApply(){
+  if(!confirm("이 공고를 지원 현황에서 빼고 스크랩으로 되돌릴까요? 올린 파일과 기록은 유지됩니다.")) return;
+  const sc=scrapOf(applyKey); sc.detail.applied=false;
+  await saveApply(false);
+  go("bookmark");
 }
 function renderApplyFiles(){
   const d=scrapOf(applyKey).detail;
   ["subs","pts","post"].forEach(function(kind){
     const el=document.getElementById("ap-"+kind); if(!el)return;
     const arr=d[kind]||[];
+    function fbtn(fn,args,label,color){ return '<button style="background:none;border:none;color:'+color+';font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:2px;" onclick="'+fn+'(\''+kind+'\','+args+')">'+label+'</button>'; }
     el.innerHTML=arr.length?arr.map(function(f,i){
-      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line-soft);font-size:13px;"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 '+esc(f.name)+'</span><button style="background:none;border:none;color:var(--navy);font-size:12px;font-weight:600;cursor:pointer;" onclick="apOpen(\''+esc(f.path)+'\')">열기</button><button style="background:none;border:none;color:var(--seal);font-size:12px;font-weight:600;cursor:pointer;" onclick="apDel(\''+kind+'\','+i+')">삭제</button></div>';
-    }).join(""):'<p class="mini-note" style="margin:2px 0 8px;">등록된 파일이 없습니다.</p>';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:13px;">'+
+        '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 '+esc(f.name)+'</span>'+
+        fbtn("apPrev",i,"미리보기","var(--navy)")+
+        fbtn("apDown",i,"다운로드","var(--navy)")+
+        fbtn("apDel",i,"삭제","var(--seal)")+'</div>';
+    }).join(""):'<p class="mini-note" style="margin:2px 0 0;">등록된 파일이 없습니다.</p>';
   });
+}
+function fileOf(kind,i){ const d=scrapOf(applyKey).detail; return (d[kind]||[])[i]; }
+async function apPrev(kind,i){
+  const f=fileOf(kind,i); if(!f||!sb) return;
+  const {data,error}=await sb.storage.from("apply-docs").createSignedUrl(f.path,3600);
+  if(data&&data.signedUrl) window.open(data.signedUrl,"_blank");
+  else alert("미리보기를 열 수 없습니다."+(error?" "+error.message:""));
+}
+async function apDown(kind,i){
+  const f=fileOf(kind,i); if(!f||!sb) return;
+  const {data,error}=await sb.storage.from("apply-docs").createSignedUrl(f.path,3600,{download:f.name});
+  if(data&&data.signedUrl){
+    const aEl=document.createElement("a"); aEl.href=data.signedUrl; aEl.download=f.name;
+    document.body.appendChild(aEl); aEl.click(); aEl.remove();
+  } else alert("다운로드에 실패했습니다."+(error?" "+error.message:""));
 }
 async function apUpload(kind,input){
   const files=Array.prototype.slice.call(input.files||[]); input.value="";
@@ -1730,6 +1788,8 @@ async function saveApply(close){
   }
   if(currentView==="scrap") renderScrap();
   if(currentView==="bookmark") renderBookmarks();
+  var msgEl=document.getElementById("ap-save-msg");
+  if(msgEl){ msgEl.textContent="저장됨 ✓"; setTimeout(function(){msgEl.textContent="";},2500); }
   if(close) closeDrawers();
 }
 
@@ -1793,7 +1853,12 @@ function applyAiCache(){
     const v=c.map[a.key];
     if(v){ a.score=v.s; a.verdict=a.score>=75?"적합":(a.score>=58?"검토":"낮음"); a.note="AI 검증: "+v.n; touched=true; }
   });
-  if(touched) ANNS.sort(function(x,y){return y.score-x.score;});
+  applyDeepCache();
+  ANNS.sort(function(x,y){return y.score-x.score;});
+}
+function applyDeepCache(){
+  const c=PROFILE.extra&&PROFILE.extra.deepCache; if(!c) return;
+  ANNS.forEach(function(a){ const v=c[a.key]; if(v&&v.j) applyDeepScore(a,v.j); });
 }
 async function aiRerank(){
   if(aiRerankRunning||!userId||!ANNS.length||annSource==="seed") return;
@@ -1911,13 +1976,48 @@ function showDayAll(y,m,d){
 }
 
 /* ══ 성장 로드맵 + 인증·제도 AI 가이드 ══ */
-const CERTS=["벤처기업확인","기업부설연구소","연구전담부서","이노비즈(기술혁신형)","메인비즈(경영혁신형)","기술보증기금 보증","GS인증(SW품질)","ISO 9001","직무발명보상제도","특허·지식재산 전략","TIPS 프로그램","수출 준비(내수→수출)"];
+const CERT_GROUPS=[
+ {g:"기업 확인·인증", items:["벤처기업확인","이노비즈(기술혁신형)","메인비즈(경영혁신형)","여성기업 확인","장애인기업 확인","사회적기업·소셜벤처","뿌리기업 확인","가족친화인증","인재육성형 중소기업"]},
+ {g:"연구·기술", items:["기업부설연구소","연구전담부서","전문연구요원(병역특례)","NEP·NET 신기술인증","GS인증(SW품질)","클라우드 보안인증(CSAP)","ISMS-P 인증","ISO 9001·27001","직무발명보상제도","특허·지식재산 전략(IP-R&D)"]},
+ {g:"세제 혜택", items:["창업기업 세액감면","R&D 세액공제(연구인력개발비)","통합투자세액공제","통합고용세액공제","스톡옵션 세제특례","가업승계·명문장수기업"]},
+ {g:"자금·보증", items:["기술보증기금 보증","신용보증기금 보증","지역신용보증재단","중진공 정책자금","매출채권보험","TIPS 프로그램"]},
+ {g:"판로·조달", items:["벤처나라 등록","조달우수제품 지정","혁신제품 지정(혁신조달)","성능인증(EPC)","창업기업 공공기관 우선구매","기술개발제품 시범구매"]},
+ {g:"인력·고용", items:["내일채움공제","청년내일채움공제","두루누리 사회보험료 지원","청년일자리도약장려금","중소기업 계약학과"]},
+ {g:"수출·글로벌", items:["수출바우처","해외규격인증 획득지원(CE·FDA 등)","무역보험·수출신용보증","브랜드K","전자상거래 수출(글로벌셀러)"]}
+];
+const CERTS=CERT_GROUPS.reduce(function(acc,gr){return acc.concat(gr.items);},[]);
 function renderCertChips(){
   const el=document.getElementById("cert-chips"); if(!el)return;
   const saved=(PROFILE.extra&&PROFILE.extra.certGuides)||{};
-  el.innerHTML=CERTS.map(function(c){
-    return '<button class="tab '+(saved[c]?"active":"")+'" onclick="certGuide(\''+c+'\')">'+(saved[c]?"✓ ":"")+c+'</button>';
+  function chip(c,title){ return '<button class="tab '+(saved[c]?"active":"")+'" '+(title?('title="'+esc(title)+'" '):'')+'onclick="certGuide(\''+c.replace(/'/g,"")+'\')">'+(saved[c]?"✓ ":"")+esc(c)+'</button>'; }
+  let out=CERT_GROUPS.map(function(gr){
+    return '<div style="margin-bottom:12px;"><div style="font-size:11.5px;font-weight:700;color:var(--ink-faint);letter-spacing:.05em;margin-bottom:6px;">'+gr.g+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;">'+gr.items.map(function(c){return chip(c);}).join("")+'</div></div>';
   }).join("");
+  const cust=(PROFILE.extra&&PROFILE.extra.customCerts)||[];
+  if(cust.length){
+    out+='<div style="margin-bottom:4px;"><div style="font-size:11.5px;font-weight:700;color:var(--seal);letter-spacing:.05em;margin-bottom:6px;">🔎 AI가 발굴한 우리 회사 맞춤 제도</div><div style="display:flex;gap:6px;flex-wrap:wrap;">'+cust.map(function(c,i){return '<button class="tab '+(saved[c.name]?"active":"")+'" title="'+esc(c.why||"")+'" onclick="certGuideCustom('+i+')">'+(saved[c.name]?"✓ ":"")+esc(c.name)+'</button>';}).join("")+'</div></div>';
+  }
+  el.innerHTML=out;
+}
+function certGuideCustom(i){
+  const cust=(PROFILE.extra&&PROFILE.extra.customCerts)||[];
+  if(cust[i]) certGuide(cust[i].name);
+}
+async function discoverCerts(){
+  const btn=document.getElementById("cert-discover-btn");
+  if(!PROFILE.company){ alert("먼저 사업 프로필을 등록해 주세요."); return; }
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 프로필 기반으로 숨은 제도 발굴 중…';
+  try{
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n너는 한국 중소기업 정책 전문 컨설턴트다. 위 회사가 실제로 활용할 수 있는데 일반 대표들이 잘 모르는 정부 제도·인증·세제혜택·바우처·특례를 발굴해라. 이 회사의 업종·업력·규모에 실제로 해당되는 것만. 다음 목록에 이미 있는 것은 제외해라: "+CERTS.join(", ")+"\n반드시 JSON만 출력: {\"items\":[{\"name\":\"제도의 공식 명칭\",\"why\":\"이 회사에 유용한 이유 25자 이내\"} — 8~12개]}"}],1400);
+    const mm=raw.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
+    const pj=JSON.parse(mm?mm[0]:raw);
+    PROFILE.extra=PROFILE.extra||{};
+    PROFILE.extra.customCerts=(pj.items||[]).filter(function(x){return x&&x.name;}).slice(0,12);
+    await saveProfileRemote();
+    renderCertChips();
+    btn.textContent="🔎 다시 발굴 (프로필 변경 후 유용)";
+  }catch(e){ alert("발굴에 실패했습니다. 잠시 후 다시 시도해 주세요."); btn.textContent="🔎 우리 회사 맞춤 숨은 제도 AI 발굴"; }
+  btn.disabled=false;
 }
 function showRoadmap(){
   renderCertChips();
@@ -1961,7 +2061,7 @@ async function certGuide(name){
   }
   gb.innerHTML='<p style="color:var(--ink-soft);"><span class="spinner dark"></span> '+esc(name)+' 가이드를 우리 회사 기준으로 작성하고 있습니다…</p>';
   try{
-    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n"+name+"에 대해 위 회사 기준의 실행 가이드를 작성해라. 형식(마크다운, 항목은 반드시 - 불릿):\n## 개요와 혜택 — 이 회사에 주는 실익 포함 (지원사업 가점·세제·보증 등)\n## 신청 자격·요건 — 우리 회사의 충족 가능성도 언급\n## 절차와 준비 서류 — 단계별로\n## 기간과 비용 — 현실적인 수치\n## 우리 회사 맞춤 팁 — 2~3개\n800자 내외. 확실하지 않은 요건·수수료는 해당 기관 확인을 권고."}],1500);
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n"+name+"에 대해 위 회사 기준의 실행 가이드를 작성해라. 형식(마크다운, 항목은 반드시 - 불릿):\n## 개요와 혜택 — 실제 수치(감면율·지원 한도·보증 한도·가점 등)를 포함해 이 회사에 주는 실익\n## 신청 자격·요건 — 우리 회사의 충족 가능성도 언급\n## 절차와 준비 서류 — 단계별로\n## 기간과 비용 — 현실적인 수치\n## 우리 회사 맞춤 팁 — 2~3개\n800자 내외. 확실하지 않은 요건·수수료는 해당 기관 확인을 권고."}],1500);
     PROFILE.extra.certGuides[name]={text:raw,at:fmtDate(new Date())};
     await saveProfileRemote();
     gb.innerHTML=mdRich(raw)+'<p class="mini-note" style="margin-top:14px;">이 가이드는 계정에 저장되었습니다.</p>';
@@ -2027,8 +2127,9 @@ async function deepAnalyze(idx){
     const keys=Object.keys(PROFILE.extra.deepCache);
     if(keys.length>20){ keys.sort(function(x,y){return (PROFILE.extra.deepCache[x].ts||0)-(PROFILE.extra.deepCache[y].ts||0);}); delete PROFILE.extra.deepCache[keys[0]]; }
     await saveProfileRemote();
-    out.innerHTML=deepHtml(pj,fmtDate(new Date()));
-    btn.textContent="다시 분석";
+    const y=window.scrollY;
+    openDetail(idx,true); // 도장 점수·매칭 사유까지 새 점수로 다시 그림 (캐시된 분석 결과 자동 표시)
+    window.scrollTo(0,y);
   }catch(e){ out.innerHTML=claudeErrHtml(e); btn.textContent="🔍 원문 정밀 분석 실행"; }
   btn.disabled=false;
 }
