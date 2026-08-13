@@ -199,17 +199,24 @@ async function fetchSmes(key) {
     const sDt = pickDateByPattern(it, /(str|bgn|begin|start).*(dt|de|dt)$/i) || pickDateByPattern(it, /^strDt$/i);
     const eDt = pickDateByPattern(it, /(end|fin|closs?).*(dt|de)$/i) || pickDateByPattern(it, /^endDt$/i);
     if (eDt && eDt < yyyymmdd(new Date())) return null; // 접수 마감 지난 공고 제외
-    let link = pick(it, ["dtlUrl", "detailUrl", "url", "link", "pblancUrl", "hmpgUrl"]);
+    let link = pick(it, ["pblancDtlUrl", "dtlUrl", "detailUrl", "reqstLinkInfo", "refrncUrl", "url", "link", "pblancUrl", "hmpgUrl"]);
     if (link && link.startsWith("/")) link = "https://www.smes.go.kr" + link;
+    if (link && !/^https?:/i.test(link)) link = "";
     return {
       key: "sm-" + (pick(it, ["pblancId", "pblancSn", "sn", "id", "seq"]) || link || title).slice(0, 110),
       title: title,
-      field: stripHtml(pick(it, ["lclasNm", "pldirSportRealmLclasCodeNm", "bsnsSeNm", "cl", "category"])) || "중기부 지원사업",
+      field: stripHtml(pick(it, ["bizType", "sportType", "lclasNm", "pldirSportRealmLclasCodeNm", "bsnsSeNm", "cl", "category"])) || "중기부 지원사업",
       agency: stripHtml(pick(it, ["cntcInsttNm", "insttNm", "jrsdInsttNm", "excInsttNm", "sportInsttNm", "orgNm"])) || "중소벤처24",
       period: (sDt || eDt) ? (ymd(sDt) + " ~ " + ymd(eDt)) : stripHtml(pick(it, ["rcptPd", "reqstPd", "period"])),
       registered: ymd(pick(it, ["pblancDt", "regDt", "frstRegistDt", "registDt", "creatDt"]) || sDt),
-      summary: stripHtml(pick(it, ["cn", "cntnts", "pblancCn", "bsnsSumryCn", "sumry", "content"])).slice(0, 300),
-      url: link || "https://www.smes.go.kr/main/sportsBsnsPolicy",
+      summary: (function () {
+        const cont = stripHtml(pick(it, ["sportCnts", "policyCnts", "cn", "cntnts", "pblancCn", "bsnsSumryCn", "sumry", "content"]));
+        const trgt = stripHtml(pick(it, ["sportTrget", "trget", "target", "aplyTrget"]));
+        let s = cont;
+        if (trgt) s = (s ? s + " · " : "") + "대상: " + trgt;
+        return s.slice(0, 300);
+      })(),
+      url: link || ("https://www.google.com/search?q=" + encodeURIComponent(title + " 공고")),
       source: "중소벤처24"
     };
   }).filter(Boolean);
