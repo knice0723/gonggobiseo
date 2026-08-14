@@ -2981,7 +2981,7 @@ async function deepAnalyze(idx){
 }
 
 /* ════════ 워크스페이스(프로젝트) — 회사별 데이터 공유 ════════ */
-let WS=null, WSLIST=[], WS_AT=0, WS_TIMER=null, WS_SAVING=false;
+let WS=null, WSLIST=[], WS_AT=0, WS_TIMER=null, WS_SAVING=false, WS_LOCK=false;
 function wsKey(){ return "ws_"+(userId||""); }
 async function loadWorkspaces(){
   if(!sb||!userId) return;
@@ -3002,8 +3002,10 @@ async function loadWorkspaces(){
     try{ sel=localStorage.getItem(wsKey()); }catch(e){}
     WS=WSLIST.find(function(o){return o.id===sel;})||WSLIST[0]||null;
     if(WS){
+      WS_LOCK=true;
       const st=await wsLoad(true);
       if(st==="empty"){ PROFILE=blankProfile(WS.name); scraps={}; }  // 절대 자동 복사하지 않음
+      WS_LOCK=false;
       startWsPoll();
     }
     renderWsBox();
@@ -3030,18 +3032,21 @@ async function switchWs(id){
   if(id==="__new"){ renderWsBox(); go("team"); setTimeout(function(){ const i=document.getElementById("org-name"); if(i)i.focus(); },300); return; }
   const o=WSLIST.find(function(x){return x.id===id;}); if(!o||(WS&&WS.id===id)) return;
   const prevProfile=JSON.parse(JSON.stringify(PROFILE)), prevScraps=JSON.parse(JSON.stringify(scraps));
+  WS_LOCK=true;                       // 전환 시작 — 이전 프로젝트 데이터가 새 프로젝트에 저장되지 않도록 잠금
   WS=o; try{ localStorage.setItem(wsKey(),id); }catch(e){}
   wsSyncBadge("전환 중…","#8a6d00");
   const st=await wsLoad(true);
   if(st==="empty"){
     const v=await showModal({title:"새 프로젝트입니다",icon:"＋",
-      msg:"'"+o.name+"' 프로젝트에는 아직 저장된 데이터가 없습니다.\n\n직전에 보던 데이터를 이 프로젝트로 복사해 시작할까요?\n(아니오를 선택하면 빈 상태로 시작합니다)",
+      msg:"'"+o.name+"' 프로젝트에는 아직 저장된 데이터가 없습니다.\n\n직전에 보던 데이터를 이 프로젝트로 복사해 시작할까요?\n(취소를 누르면 빈 상태로 시작합니다)",
       cancel:true, okText:"복사해서 시작"});
     if(v!==null){ PROFILE=prevProfile; scraps=prevScraps; PROFILE.company=PROFILE.company||o.name; }
     else { PROFILE=blankProfile(o.name); scraps={}; }
     rescoreAll();
+    WS_LOCK=false;
     await wsSave();
   }
+  WS_LOCK=false;
   document.getElementById("greet-name").textContent=greet();
   rescoreAll(); applyAiCache();
   const v2=currentView;
@@ -3076,6 +3081,7 @@ function blankProfile(name){
 }
 async function wsSave(){
   if(!sb||!WS||WS_SAVING) return false;
+  if(WS_LOCK){ return false; }  // 전환 중에는 저장 금지 (데이터 혼입 방지)
   WS_SAVING=true;
   try{
     const payload={profile:PROFILE,scraps:scraps,at:Date.now(),by:userEmail||""};
@@ -3176,12 +3182,26 @@ async function renderTeam(){
   await loadWorkspaces();
   await loadOrg();
 
+  // 각 프로젝트에 실제로 저장된 내용을 미리 조회해 표시 (혼동 방지)
+  let ODMAP={};
+  try{
+    const {data:ods}=await sb.from("org_data").select("org_id,data,updated_at,updated_by").in("org_id",WSLIST.map(function(x){return x.id;}));
+    (ods||[]).forEach(function(d){ ODMAP[d.org_id]=d; });
+  }catch(e){}
   const wsCards=WSLIST.map(function(o){
     const cur=WS&&o.id===WS.id;
     return '<div class="panel" style="margin-bottom:10px;border-color:'+(cur?"var(--seal)":"var(--line)")+';display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'+
       '<div style="width:38px;height:38px;border-radius:10px;background:var(--seal-wash);color:var(--seal-deep);display:flex;align-items:center;justify-content:center;font-weight:800;font-family:var(--serif);">'+esc(String(o.name).charAt(0))+'</div>'+
-      '<div style="flex:1;min-width:180px;"><b style="font-size:14px;">'+esc(o.name)+'</b>'+(cur?' <span style="font-size:11px;color:var(--seal);font-weight:700;">· 현재 작업 중</span>':'')+
-      '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px;">'+(o.owner_id===userId?"내가 만든 프로젝트":"참여 중")+'</div></div>'+
+      '<div style="flex:1;min-width:200px;"><b style="font-size:14px;">'+esc(o.name)+'</b>'+(cur?' <span style="font-size:11px;color:var(--seal);font-weight:700;">· 현재 작업 중</span>':'')+
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:3px;">'+(function(){
+        const d=ODMAP[o.id];
+        if(!d||!d.data||!d.data.profile) return "저장된 데이터 없음 (빈 프로젝트)";
+        const p=d.data.profile, b=(p.extra&&p.extra.bank)||{};
+        const bn=Object.keys(b).filter(function(k){return String(b[k]||"").length>=20;}).length;
+        const pl=Object.keys((p.extra&&p.extra.plans)||{}).length;
+        const warn=(p.company&&p.company!==o.name)?(' <span style="color:var(--seal);font-weight:700;">⚠ 프로젝트명과 회사명이 다릅니다</span>'):'';
+        return "저장된 회사명: <b>"+esc(p.company||"미입력")+"</b>"+(p.industry?(" · "+esc(p.industry)):"")+" · 데이터뱅크 "+bn+"개 · 사업계획서 "+pl+"건"+warn;
+      })()+'</div></div>'+
       (cur?'':'<button class="btn" onclick="switchWs(\''+o.id+'\')">전환</button>')+
       (o.owner_id===userId?('<button class="btn" style="font-size:11.5px;" onclick="renameWs(\''+o.id+'\')">이름 변경</button>'+
         '<button class="btn" style="font-size:11.5px;color:var(--seal);" onclick="resetWs(\''+o.id+'\')">데이터 초기화</button>'+
