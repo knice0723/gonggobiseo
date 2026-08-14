@@ -448,7 +448,13 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
   </aside>
 
   <main class="main">
-    <div class="topbar"><span id="top-user">체험 모드</span><span style="color:var(--line);">|</span><button onclick="doLogout()">로그아웃</button></div>
+    <div class="topbar">
+      <span id="ws-box" style="display:none;align-items:center;gap:7px;margin-right:auto;">
+        <span style="font-size:11.5px;color:var(--ink-faint);font-weight:700;">프로젝트</span>
+        <select id="ws-sel" onchange="switchWs(this.value)" style="border:1px solid var(--line);border-radius:7px;padding:4px 9px;font-size:12.5px;font-weight:700;max-width:220px;"></select>
+        <span id="ws-sync" style="font-size:11px;color:var(--ink-faint);"></span>
+      </span>
+      <span id="top-user">체험 모드</span><span style="color:var(--line);">|</span><button onclick="doLogout()">로그아웃</button></div>
     <div class="mobile-brand" onclick="go('dashboard')" style="cursor:pointer;"><div class="logo-seal">告</div><div class="logo-name">공고비서</div></div>
 
     <div id="view-dashboard" class="view">
@@ -789,7 +795,7 @@ const CONFIG = {
   SUPABASE_URL: "https://wtgfihfsjslnzbjhfijp.supabase.co",        // 예: "https://xxxx.supabase.co"
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0Z2ZpaGZzanNsbnpiamhmaWpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0MjEzMTMsImV4cCI6MjEwMTk5NzMxM30.ho84pGKYPVvIuGyT9C5kGhugsvcAMQwyRVuF6aLhlVw"    // Supabase → Settings → API Keys 의 anon public 키
 };
-  
+
 /* ══ 상태 ══ */
 const DEMO_AUTH = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = DEMO_AUTH ? null : window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
@@ -1233,7 +1239,7 @@ async function doLogin(){
   btn.disabled=false;
   if(error){ msg("login-msg","err","로그인에 실패했습니다: "+error.message); return; }
   userId=data.user.id; userEmail=data.user.email;
-  await loadUserData(); bumpLogin(); loadOrg(); enterApp();
+  await loadUserData(); bumpLogin(); await loadWorkspaces(); loadOrg(); enterApp();
 }
 async function doSignup(){
   if(DEMO_AUTH){ msg("signup-msg","err","아직 데이터베이스가 연결되지 않았습니다. 설치가이드 2단계(Supabase 연결)를 완료하면 회원가입이 활성화됩니다."); return; }
@@ -1256,6 +1262,7 @@ async function loadUserData(){
   scraps={}; (s||[]).forEach(r=>scraps[r.ann_key]={status:r.status||"검토 중",detail:(r.detail&&typeof r.detail==="object")?r.detail:{}});
 }
 async function saveProfileRemote(){
+  if(WS){ await wsSave(); if(sb&&userId){ try{ await sb.from("profiles").update({company:PROFILE.company,email:userEmail||"",org_id:WS.id}).eq("id",userId); }catch(e){} } return; }
   if(!sb||!userId) return;
   await sb.from("profiles").upsert({ id:userId, email:userEmail||"", company:PROFILE.company, industry:PROFILE.industry, founded:PROFILE.founded, region:PROFILE.region, staff:PROFILE.staff, revenue:PROFILE.revenue, descr:PROFILE.descr, keywords:PROFILE.keywords, extra:PROFILE.extra||{}, doc_summary:(PROFILE.extra&&PROFILE.extra.doc&&PROFILE.extra.doc.summary)||"", updated_at:new Date().toISOString() });
 }
@@ -1402,6 +1409,7 @@ async function toggleScrap(idx){
   }else{
     scraps[a.key]={status:"검토 중",detail:{}};
     if(sb&&userId) await sb.from("scraps").upsert({user_id:userId,ann_key:a.key,title:a.title,deadline:a.deadlineText,url:a.url,status:"검토 중",detail:{}});
+  if(WS) wsSave();
   }
   if(currentView==="dashboard")renderDash();
   if(currentView==="search")renderSearch();
@@ -2350,6 +2358,7 @@ async function saveApply(close){
   if(sb&&userId){
     const a=ANNS.find(function(x){return x.key===applyKey;})||{};
     await sb.from("scraps").upsert({user_id:userId,ann_key:applyKey,title:a.title||"",deadline:a.deadlineText||"",url:a.url||"",status:sc.status,detail:sc.detail});
+    if(WS) await wsSave();
   }
   if(currentView==="scrap") renderScrap();
   if(currentView==="bookmark") renderBookmarks();
@@ -2828,6 +2837,114 @@ async function deepAnalyze(idx){
   btn.disabled=false;
 }
 
+/* ════════ 워크스페이스(프로젝트) — 회사별 데이터 공유 ════════ */
+let WS=null, WSLIST=[], WS_AT=0, WS_TIMER=null, WS_SAVING=false;
+function wsKey(){ return "ws_"+(userId||""); }
+async function loadWorkspaces(){
+  if(!sb||!userId) return;
+  const em=(userEmail||"").toLowerCase();
+  try{
+    if(em){ // 초대 자동 수락
+      const {data:inv}=await sb.from("org_members").select("id,org_id,status").eq("email",em).neq("status","active");
+      if(inv&&inv.length){ for(const r of inv){ await sb.from("org_members").update({user_id:userId,status:"active"}).eq("id",r.id); } PENDING_JOIN=true; }
+    }
+    const {data:ms}=await sb.from("org_members").select("org_id,role").eq("status","active").or("user_id.eq."+userId+(em?(",email.eq."+em):""));
+    const ids=[...new Set((ms||[]).map(function(m){return m.org_id;}))];
+    const {data:own}=await sb.from("orgs").select("*").eq("owner_id",userId);
+    (own||[]).forEach(function(o){ if(ids.indexOf(o.id)<0) ids.push(o.id); });
+    if(!ids.length){ WSLIST=[]; WS=null; renderWsBox(); return; }
+    const {data:os}=await sb.from("orgs").select("*").in("id",ids);
+    WSLIST=(os||[]).sort(function(a,b){return String(a.name).localeCompare(String(b.name));});
+    let sel=null;
+    try{ sel=localStorage.getItem(wsKey()); }catch(e){}
+    WS=WSLIST.find(function(o){return o.id===sel;})||WSLIST[0]||null;
+    if(WS){ await wsLoad(true); startWsPoll(); }
+    renderWsBox();
+    if(PENDING_JOIN&&WS){
+      PENDING_JOIN=false;
+      setTimeout(function(){ uiAlert("'"+WS.name+"' 프로젝트에 연결되었습니다.\n회사 데이터가 자동으로 공유되어 바로 사용할 수 있습니다.","팀 연결 완료"); },1200);
+    }
+  }catch(e){ WSLIST=[]; WS=null; }
+}
+function renderWsBox(){
+  const box=document.getElementById("ws-box"), sel=document.getElementById("ws-sel");
+  if(!box) return;
+  if(!WSLIST.length){ box.style.display="none"; return; }
+  box.style.display="flex";
+  sel.innerHTML=WSLIST.map(function(o){return '<option value="'+o.id+'" '+(WS&&o.id===WS.id?"selected":"")+'>'+esc(o.name)+'</option>';}).join("")+
+    '<option value="__new">+ 새 프로젝트 만들기</option>';
+  wsSyncBadge("공유 중");
+}
+function wsSyncBadge(t,color){
+  const el=document.getElementById("ws-sync"); if(!el) return;
+  el.innerHTML=(color?'<span style="color:'+color+';">●</span> ':'<span style="color:#1a7f37;">●</span> ')+t;
+}
+async function switchWs(id){
+  if(id==="__new"){ renderWsBox(); go("team"); setTimeout(function(){ const i=document.getElementById("org-name"); if(i)i.focus(); },300); return; }
+  const o=WSLIST.find(function(x){return x.id===id;}); if(!o) return;
+  WS=o; try{ localStorage.setItem(wsKey(),id); }catch(e){}
+  wsSyncBadge("불러오는 중…","#8a6d00");
+  await wsLoad(true);
+  await loadOrg();
+  enterApp();
+}
+async function wsLoad(apply){
+  if(!sb||!WS) return false;
+  try{
+    const {data}=await sb.from("org_data").select("*").eq("org_id",WS.id).maybeSingle();
+    if(!data||!data.data){ WS_AT=0; return false; }
+    WS_AT=new Date(data.updated_at||0).getTime();
+    if(apply&&data.data.profile){
+      PROFILE=data.data.profile;
+      if(data.data.scraps&&typeof data.data.scraps==="object") scraps=data.data.scraps;
+      rescoreAll();
+    }
+    return true;
+  }catch(e){ return false; }
+}
+async function wsSave(){
+  if(!sb||!WS||WS_SAVING) return false;
+  WS_SAVING=true;
+  try{
+    const payload={profile:PROFILE,scraps:scraps,at:Date.now(),by:userEmail||""};
+    const now=new Date().toISOString();
+    const {error}=await sb.from("org_data").upsert({org_id:WS.id,data:payload,updated_at:now,updated_by:userEmail||""});
+    if(!error){ WS_AT=new Date(now).getTime(); wsSyncBadge("저장됨"); }
+    else wsSyncBadge("저장 실패","#b22222");
+  }catch(e){ wsSyncBadge("저장 실패","#b22222"); }
+  WS_SAVING=false;
+  return true;
+}
+function startWsPoll(){
+  if(WS_TIMER) clearInterval(WS_TIMER);
+  WS_TIMER=setInterval(async function(){
+    if(!sb||!WS||WS_SAVING||document.hidden) return;
+    try{
+      const {data}=await sb.from("org_data").select("updated_at,updated_by").eq("org_id",WS.id).maybeSingle();
+      if(!data) return;
+      const t=new Date(data.updated_at||0).getTime();
+      if(t>WS_AT+1500&&String(data.updated_by||"")!==(userEmail||"")){
+        await wsLoad(true);
+        wsSyncBadge("업데이트됨","#1a7f37");
+        showToast(String(data.updated_by||"팀원").split("@")[0]+"님이 데이터를 수정했습니다 — 최신 내용으로 갱신되었습니다");
+        if(currentView==="bank") renderBank();
+        if(currentView==="profile") fillProfileForm();
+        if(currentView==="dashboard") renderDash();
+        if(currentView==="scrap") renderScrap();
+        if(currentView==="writer") renderWriter();
+      }
+    }catch(e){}
+  },20000);
+}
+function showToast(msg){
+  let t=document.getElementById("toast");
+  if(!t){ t=document.createElement("div"); t.id="toast";
+    t.style.cssText="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 20px;border-radius:99px;font-size:13px;font-weight:600;z-index:300;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .3s;";
+    document.body.appendChild(t); }
+  t.textContent=msg; t.style.opacity="1";
+  clearTimeout(t._h); t._h=setTimeout(function(){ t.style.opacity="0"; },4000);
+}
+
 /* ════════ 팀 협업 ════════ */
 let ORG=null, ORG_MEMBERS=[], ORG_LOGS=[], ORG_NOTES={};
 async function loadOrg(){
@@ -2861,14 +2978,7 @@ async function loadOrg(){
       ORG_MEMBERS=ms||[];
       myRole=(ORG.owner_id===userId)?"owner":((ORG_MEMBERS.find(function(m){return m.user_id===userId||String(m.email||"").toLowerCase()===em;})||{}).role||"member");
       await loadNotes();
-      if(PENDING_JOIN){
-        PENDING_JOIN=false;
-        setTimeout(function(){
-          showModal({title:"팀에 연결되었습니다",icon:"✓",
-            msg:"'"+ORG.name+"' 팀의 구성원으로 연결되었습니다.\n\n팀 데이터를 가져오면 회사의 사업 프로필·데이터뱅크·사업계획서를 함께 사용할 수 있습니다.",
-            okText:"팀 데이터 가져오기",cancel:true}).then(function(v){ if(v!==null) pullOrgData(); });
-        },1500);
-      }
+
     }
   }catch(e){ ORG=null; }
 }
@@ -2891,61 +3001,67 @@ async function renderTeam(){
   const el=document.getElementById("team-body");
   if(!sb||!userId){ el.innerHTML='<div class="empty">팀 기능은 로그인 후 사용할 수 있습니다.</div>'; return; }
   el.innerHTML='<div class="panel"><span class="spinner dark"></span> 불러오는 중…</div>';
+  await loadWorkspaces();
   await loadOrg();
-  if(!ORG){
-    let pend="";
-    try{
-      const {data:inv}=await sb.from("org_members").select("org_id,status").eq("email",(userEmail||"").toLowerCase());
-      if(inv&&inv.length){
-        pend='<div class="ai-result" style="margin-bottom:14px;"><b>받은 초대가 있습니다</b>'+
-          '<p style="font-size:12.5px;color:var(--ink-soft);margin-top:6px;line-height:1.6;">초대가 아직 연결되지 않았습니다. 아래 버튼을 눌러 수락하세요. 연결되지 않으면 Supabase에서 <b>팀초대-보정4.sql</b>을 실행했는지 확인해 주세요.</p>'+
-          '<button class="btn btn-seal" style="margin-top:10px;" onclick="acceptInvite()">초대 수락하고 팀 참여</button></div>';
-      }
-    }catch(e){}
-    el.innerHTML=pend+'<div class="panel"><h3>회사(팀) 만들기</h3>'+
-      '<p style="font-size:13px;color:var(--ink-soft);line-height:1.75;">회사를 만들면 관리자가 되어 직원을 초대할 수 있습니다. 초대된 구성원은 같은 사업 프로필·데이터뱅크·사업계획서를 공유합니다.</p>'+
-      '<div class="field" style="margin-top:14px;"><label>회사 이름</label><input type="text" id="org-name" value="'+esc(PROFILE.company||"")+'" placeholder="예: 엔아이소프트(주)"></div>'+
-      '<button class="btn btn-seal" onclick="createOrg()">회사 만들고 관리자 되기</button></div>';
-    return;
-  }
-  const {data:logs}=await sb.from("org_logs").select("*").eq("org_id",ORG.id).order("created_at",{ascending:false}).limit(60);
-  ORG_LOGS=logs||[];
-  const isAdmin=(myRole==="owner"||myRole==="admin");
-  el.innerHTML=
-    '<div class="content-grid" style="align-items:start;">'+
-    '<div>'+
+
+  const wsCards=WSLIST.map(function(o){
+    const cur=WS&&o.id===WS.id;
+    return '<div class="panel" style="margin-bottom:10px;border-color:'+(cur?"var(--seal)":"var(--line)")+';display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'+
+      '<div style="width:38px;height:38px;border-radius:10px;background:var(--seal-wash);color:var(--seal-deep);display:flex;align-items:center;justify-content:center;font-weight:800;font-family:var(--serif);">'+esc(String(o.name).charAt(0))+'</div>'+
+      '<div style="flex:1;min-width:180px;"><b style="font-size:14px;">'+esc(o.name)+'</b>'+(cur?' <span style="font-size:11px;color:var(--seal);font-weight:700;">· 현재 작업 중</span>':'')+
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px;">'+(o.owner_id===userId?"내가 만든 프로젝트":"참여 중")+'</div></div>'+
+      (cur?'':'<button class="btn" onclick="switchWs(\''+o.id+'\')">이 프로젝트로 전환</button>')+
+      '</div>';
+  }).join("");
+
+  let pend="";
+  try{
+    const {data:inv}=await sb.from("org_members").select("org_id,status").eq("email",(userEmail||"").toLowerCase()).neq("status","active");
+    if(inv&&inv.length) pend='<div class="ai-result" style="margin-bottom:14px;"><b>받은 초대가 있습니다</b><button class="btn btn-seal" style="margin-top:10px;display:block;" onclick="acceptInvite()">초대 수락하고 참여</button></div>';
+  }catch(e){}
+
+  const isAdmin=ORG&&(myRole==="owner"||myRole==="admin");
+  let memberHtml="";
+  if(ORG){
+    const {data:logs}=await sb.from("org_logs").select("*").eq("org_id",ORG.id).order("created_at",{ascending:false}).limit(40);
+    ORG_LOGS=logs||[];
+    memberHtml=
       '<div class="panel" style="margin-bottom:14px;"><h3>'+esc(ORG.name)+' · 구성원 '+ORG_MEMBERS.length+'명</h3>'+
+      '<p class="mini-note" style="margin:0 0 12px;">구성원은 이 프로젝트의 사업 프로필·데이터뱅크·사업계획서·지원 현황을 <b>자동으로 함께</b> 사용합니다. 별도 공유 과정이 없습니다.</p>'+
       ORG_MEMBERS.map(function(m){
-        const me=(m.user_id===userId||m.email===userEmail);
+        const me=(m.user_id===userId||String(m.email||"").toLowerCase()===(userEmail||"").toLowerCase());
         return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-soft);flex-wrap:wrap;">'+
-          '<div style="width:32px;height:32px;border-radius:99px;background:var(--seal-wash);color:var(--seal-deep);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">'+esc(String(m.email||"?").charAt(0).toUpperCase())+'</div>'+
-          '<div style="flex:1;min-width:160px;"><b style="font-size:13px;">'+esc(m.email)+(me?" (나)":"")+'</b>'+
-          '<div style="font-size:11.5px;color:var(--ink-faint);">'+(m.role==="owner"?"관리자":(m.role==="admin"?"부관리자":"구성원"))+' · '+(m.status==="active"?"활성":"초대됨 — 해당 이메일로 가입하면 자동 연결")+'</div></div>'+
-          ((isAdmin&&m.role!=="owner")?'<button class="btn" style="font-size:11.5px;color:var(--seal);" onclick="removeMember(\''+m.id+'\')">삭제</button>':'')+'</div>';
+          '<div style="width:32px;height:32px;border-radius:99px;background:var(--paper);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">'+esc(String(m.email||"?").charAt(0).toUpperCase())+'</div>'+
+          '<div style="flex:1;min-width:170px;"><b style="font-size:13px;">'+esc(m.email)+(me?" (나)":"")+'</b>'+
+          '<div style="font-size:11.5px;color:var(--ink-faint);">'+(m.role==="owner"?"관리자":"구성원")+' · '+(m.status==="active"?'<span style="color:#1a7f37;">연결됨</span>':"초대됨 — 가입 대기")+'</div></div>'+
+          ((isAdmin&&m.role!=="owner")?'<button class="btn" style="font-size:11.5px;color:var(--seal);" onclick="removeMember(\''+m.id+'\')">제외</button>':'')+'</div>';
       }).join("")+
       (isAdmin?('<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"><input type="text" id="inv-email" placeholder="초대할 직원 이메일" style="flex:1;min-width:200px;">'+
-        '<button class="btn btn-seal" onclick="inviteMember()">초대</button></div>'+
-        '<p class="mini-note" style="margin-top:6px;">초대한 이메일로 회원가입하면 자동으로 팀에 연결됩니다.</p>'):'')+
+        '<button class="btn btn-seal" onclick="inviteMember()">초대</button></div>'):'')+
       '</div>'+
-      '<div class="panel"><h3>공유 데이터</h3>'+
-        '<p style="font-size:13px;color:var(--ink-soft);line-height:1.7;">회사 데이터를 팀과 공유하면 구성원 모두가 같은 프로필·데이터뱅크·사업계획서를 사용합니다.</p>'+
-        '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">'+
-        '<button class="btn btn-primary" onclick="pushOrgData()">내 데이터를 팀에 공유(업로드)</button>'+
-        '<button class="btn" onclick="pullOrgData()">팀 데이터 가져오기(내려받기)</button></div>'+
-        '<p class="mini-note" style="margin-top:8px;">가져오기를 하면 내 화면의 프로필·데이터뱅크가 팀 최신본으로 바뀝니다.</p>'+
-      '</div>'+
-    '</div>'+
-    '<div class="panel"><h3>활동 기록</h3>'+
+      '<div class="panel"><h3>변경 이력</h3>'+
       (ORG_LOGS.length?ORG_LOGS.map(function(l){
         const d=new Date(l.created_at);
-        const ico=l.action==="comment"?"💬":(l.action==="delete"?"🗑":"✏");
-        return '<div style="padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px;">'+
-          '<div style="display:flex;gap:6px;"><span>'+ico+'</span><div style="flex:1;"><b>'+esc(String(l.actor_email||"").split("@")[0])+'</b> · '+esc(l.target_name||l.target||"")+
+        return '<div style="padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px;"><b>'+esc(String(l.actor_email||"").split("@")[0])+'</b> · '+esc(l.target_name||l.target||"")+
           '<div style="color:var(--ink-soft);margin-top:2px;line-height:1.55;">'+esc(l.summary||"")+'</div>'+
-          '<div style="color:var(--ink-faint);font-size:11px;margin-top:2px;">'+d.toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+'</div></div></div></div>';
-      }).join(""):'<p class="mini-note">아직 활동 기록이 없습니다.</p>')+
-    '</div></div>';
+          '<div style="color:var(--ink-faint);font-size:11px;margin-top:2px;">'+d.toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})+'</div></div>';
+      }).join(""):'<p class="mini-note">아직 변경 이력이 없습니다.</p>')+'</div>';
+  }
+
+  el.innerHTML=pend+
+    '<div class="content-grid" style="align-items:start;">'+
+    '<div>'+
+      (WSLIST.length?('<div style="margin-bottom:6px;"><b style="font-family:var(--serif);font-size:15px;">내 프로젝트 '+WSLIST.length+'개</b><p class="mini-note" style="margin:4px 0 10px;">회사별로 프로필·데이터뱅크·사업계획서가 따로 관리됩니다. 상단에서 언제든 전환할 수 있습니다.</p></div>'+wsCards):'')+
+      '<div class="panel"><h3>'+(WSLIST.length?"새 프로젝트 추가":"프로젝트 만들기")+'</h3>'+
+      '<p style="font-size:13px;color:var(--ink-soft);line-height:1.7;">관리할 회사를 추가하세요. 여러 회사를 운영한다면 각각 프로젝트로 만들어 전환하며 쓸 수 있습니다.</p>'+
+      '<div class="field" style="margin-top:12px;"><label>회사·프로젝트 이름</label><input type="text" id="org-name" placeholder="예: 엔아이소프트(주)" value="'+esc(WSLIST.length?"":(PROFILE.company||""))+'"></div>'+
+      '<button class="btn btn-seal" onclick="createOrg()">만들기</button>'+
+      (WSLIST.length?'<p class="mini-note" style="margin-top:8px;">새 프로젝트는 빈 상태로 시작합니다. 현재 프로젝트의 데이터는 그대로 유지됩니다.</p>':'<p class="mini-note" style="margin-top:8px;">지금까지 입력한 프로필·데이터뱅크가 이 프로젝트로 자동 이관됩니다.</p>')+
+      '</div>'+
+    '</div>'+
+    '<div>'+memberHtml+'</div></div>';
 }
+
 async function acceptInvite(){
   const em=(userEmail||"").toLowerCase();
   const {data:inv,error}=await sb.from("org_members").select("id,org_id").eq("email",em);
@@ -2955,20 +3071,27 @@ async function acceptInvite(){
     if(e2){ uiAlert("초대 수락 실패: "+e2.message+"\n\nSupabase에서 팀초대-보정4.sql을 실행했는지 확인하세요."); return; }
   }
   try{ await sb.from("profiles").update({org_id:inv[0].org_id}).eq("id",userId); }catch(e){}
-  await loadOrg();
-  uiAlert("팀에 연결되었습니다.");
-  renderTeam();
+  await loadWorkspaces(); await loadOrg();
+  uiAlert("팀에 연결되었습니다. 회사 데이터가 자동으로 공유됩니다.","연결 완료");
+  enterApp();
 }
 async function createOrg(){
-  const nm=document.getElementById("org-name").value.trim();
-  if(!nm){ uiAlert("회사 이름을 입력해 주세요."); return; }
+  const nm=(document.getElementById("org-name").value||"").trim();
+  if(!nm){ uiAlert("회사·프로젝트 이름을 입력해 주세요."); return; }
   const {data,error}=await sb.from("orgs").insert({name:nm,owner_id:userId}).select().maybeSingle();
-  if(error){ uiAlert("생성 실패: "+error.message+"\n\nSupabase에서 팀협업-업데이트3.sql을 실행했는지 확인하세요."); return; }
+  if(error){ uiAlert("생성 실패: "+error.message+"\n\nSupabase에서 team-policy-fix5.sql을 실행했는지 확인하세요."); return; }
   await sb.from("org_members").insert({org_id:data.id,user_id:userId,email:userEmail||"",role:"owner",status:"active"});
-  await sb.from("profiles").update({org_id:data.id}).eq("id",userId);
-  await logAct("org","회사","create","회사를 만들었습니다: "+nm);
-  renderTeam();
+  const first=(WSLIST.length===0);
+  const payload=first?{profile:PROFILE,scraps:scraps,at:Date.now(),by:userEmail||""}
+                     :{profile:{company:nm,industry:"",founded:"",region:"",staff:"",revenue:"",descr:"",keywords:[],extra:{}},scraps:{},at:Date.now(),by:userEmail||""};
+  await sb.from("org_data").upsert({org_id:data.id,data:payload,updated_at:new Date().toISOString(),updated_by:userEmail||""});
+  try{ localStorage.setItem(wsKey(),data.id); }catch(e){}
+  await loadWorkspaces(); await loadOrg();
+  await logAct("org","프로젝트","create","'"+nm+"' 프로젝트를 만들었습니다");
+  uiAlert("'"+nm+"' 프로젝트를 만들었습니다.\n"+(first?"기존에 입력한 데이터가 이 프로젝트로 이관되었습니다.":"상단에서 프로젝트를 전환할 수 있습니다."),"완료");
+  enterApp();
 }
+
 async function inviteMember(){
   const em=document.getElementById("inv-email").value.trim().toLowerCase();
   if(!em||em.indexOf("@")<0){ uiAlert("올바른 이메일을 입력해 주세요."); return; }
@@ -2977,9 +3100,9 @@ async function inviteMember(){
   await logAct("member","구성원","create",em+" 님을 초대했습니다");
   const link=location.origin;
   showModal({title:"초대 등록 완료",icon:"✉",
-    msg:em+" 님을 팀에 등록했습니다.\n\n※ 초대 메일은 자동 발송되지 않습니다. 아래 안내를 복사해 직접 전달해 주세요.\n※ 이미 가입한 계정이면 그 계정으로 로그인 후 [설정 → 팀·협업]에서 '초대 수락'을 누르면 됩니다.\n\n──────────\n[공고비서 팀 초대]\n"+ORG.name+" 팀에 초대되었습니다.\n1) "+link+" 접속\n2) "+em+" 이메일로 회원가입\n3) 가입 즉시 팀에 자동 연결됩니다\n──────────",
+    msg:em+" 님을 '"+ORG.name+"' 프로젝트에 등록했습니다.\n연결되면 회사 데이터가 자동으로 공유되며, 별도 공유 과정은 필요 없습니다.\n\n※ 초대 메일은 자동 발송되지 않습니다. 아래 안내를 복사해 전달해 주세요.\n\n──────────\n[공고비서 팀 초대]\n"+ORG.name+" 프로젝트에 초대되었습니다.\n1) "+link+" 접속\n2) "+em+" 이메일로 회원가입 (이미 가입했다면 로그인)\n3) 즉시 팀에 연결되어 회사 데이터를 함께 사용합니다\n──────────",
     okText:"안내문 복사"}).then(function(){
-      navigator.clipboard.writeText("[공고비서 팀 초대]\n"+ORG.name+" 팀에 초대되었습니다.\n1) "+link+" 접속\n2) "+em+" 이메일로 회원가입\n3) 가입 즉시 팀에 자동 연결됩니다").catch(function(){});
+      navigator.clipboard.writeText("[공고비서 팀 초대]\n"+ORG.name+" 프로젝트에 초대되었습니다.\n1) "+link+" 접속\n2) "+em+" 이메일로 회원가입 (이미 가입했다면 로그인)\n3) 즉시 팀에 연결되어 회사 데이터를 함께 사용합니다").catch(function(){});
     });
   renderTeam();
 }
@@ -2988,25 +3111,6 @@ async function removeMember(id){
   await sb.from("org_members").delete().eq("id",id);
   await logAct("member","구성원","delete","구성원을 제외했습니다");
   renderTeam();
-}
-async function pushOrgData(){
-  if(!ORG) return;
-  if(!await uiConfirm("내 프로필·데이터뱅크·사업계획서를 팀 공유본으로 올릴까요?\n팀의 기존 공유본을 덮어씁니다.")) return;
-  const payload={profile:PROFILE,at:Date.now()};
-  const {error}=await sb.from("org_data").upsert({org_id:ORG.id,data:payload,updated_at:new Date().toISOString(),updated_by:userEmail||""});
-  if(error){ uiAlert("공유 실패: "+error.message); return; }
-  await logAct("orgdata","공유 데이터","update","프로필·데이터뱅크를 팀에 공유했습니다");
-  uiAlert("팀에 공유했습니다."); renderTeam();
-}
-async function pullOrgData(){
-  if(!ORG) return;
-  const {data}=await sb.from("org_data").select("*").eq("org_id",ORG.id).maybeSingle();
-  if(!data||!data.data||!data.data.profile){ uiAlert("공유된 데이터가 없습니다."); return; }
-  if(!await uiConfirm("팀 공유본을 가져오면 내 프로필·데이터뱅크가 팀 최신본으로 바뀝니다.\n계속할까요?")) return;
-  PROFILE=data.data.profile;
-  await saveProfileRemote();
-  await logAct("orgdata","공유 데이터","update","팀 데이터를 가져왔습니다");
-  uiAlert("가져왔습니다. 화면을 새로고침합니다."); location.reload();
 }
 /* 항목별 메모 */
 function noteBadge(target){
@@ -3714,7 +3818,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawers();});
     const {data} = await sb.auth.getSession();
     if(data&&data.session){
       userId=data.session.user.id; userEmail=data.session.user.email;
-      await loadUserData(); bumpLogin(); loadOrg();
+      await loadUserData(); bumpLogin(); await loadWorkspaces(); loadOrg();
       if(!PROFILE.company){ enterApp(); go("onboarding"); document.getElementById("app").classList.add("hidden"); }
       else enterApp();
       bootDone();
