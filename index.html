@@ -796,7 +796,6 @@ const CONFIG = {
   SUPABASE_URL: "https://wtgfihfsjslnzbjhfijp.supabase.co",        // 예: "https://xxxx.supabase.co"
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0Z2ZpaGZzanNsbnpiamhmaWpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0MjEzMTMsImV4cCI6MjEwMTk5NzMxM30.ho84pGKYPVvIuGyT9C5kGhugsvcAMQwyRVuF6aLhlVw"    // Supabase → Settings → API Keys 의 anon public 키
 };
-
 /* ══ 상태 ══ */
 const DEMO_AUTH = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = DEMO_AUTH ? null : window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
@@ -3247,6 +3246,10 @@ async function renderTeam(){
     '<div class="content-grid" style="align-items:start;">'+
     '<div>'+
       (WSLIST.length?('<div style="margin-bottom:6px;"><b style="font-family:var(--serif);font-size:15px;">내 프로젝트 '+WSLIST.length+'개</b><p class="mini-note" style="margin:4px 0 10px;">회사별로 프로필·데이터뱅크·사업계획서가 따로 관리됩니다. 상단에서 언제든 전환할 수 있습니다.</p></div>'+wsCards):'')+
+      (WS?('<div class="panel" style="margin-bottom:12px;background:var(--paper);"><h3>이 프로젝트에 내 데이터 가져오기</h3>'+
+        '<p style="font-size:12.5px;color:var(--ink-soft);line-height:1.7;">프로젝트 기능이 생기기 전에 입력한 데이터는 <b>계정에 따로 저장</b>되어 있습니다. 아래 버튼으로 현재 프로젝트(<b>'+esc(WS.name)+'</b>)에 옮길 수 있습니다.</p>'+
+        '<button class="btn btn-primary" style="margin-top:10px;" onclick="importPersonalData()">내 계정 데이터를 '+esc(WS.name)+'로 가져오기</button>'+
+        '<p class="mini-note" style="margin-top:6px;">회사별 원본이 각기 다른 계정에 있다면, 그 계정으로 로그인해 해당 프로젝트에서 실행하세요.</p></div>'):'')+
       '<div class="panel"><h3>'+(WSLIST.length?"새 프로젝트 추가":"프로젝트 만들기")+'</h3>'+
       '<p style="font-size:13px;color:var(--ink-soft);line-height:1.7;">관리할 회사를 추가하세요. 여러 회사를 운영한다면 각각 프로젝트로 만들어 전환하며 쓸 수 있습니다.</p>'+
       '<div class="field" style="margin-top:12px;"><label>회사·프로젝트 이름</label><input type="text" id="org-name" placeholder="예: 엔아이소프트(주)" value="'+esc(WSLIST.length?"":(PROFILE.company||""))+'"></div>'+
@@ -3268,6 +3271,30 @@ async function acceptInvite(){
   try{ await sb.from("profiles").update({org_id:inv[0].org_id}).eq("id",userId); }catch(e){}
   await loadWorkspaces(); await loadOrg();
   uiAlert("팀에 연결되었습니다. 회사 데이터가 자동으로 공유됩니다.","연결 완료");
+  enterApp();
+}
+async function importPersonalData(){
+  if(!sb||!userId||!WS){ uiAlert("프로젝트를 먼저 선택해 주세요."); return; }
+  const {data:p,error}=await sb.from("profiles").select("*").eq("id",userId).maybeSingle();
+  if(error||!p){ uiAlert("내 계정에 저장된 데이터를 찾지 못했습니다."); return; }
+  const ex=(p.extra&&typeof p.extra==="object")?p.extra:{};
+  const bn=Object.keys(ex.bank||{}).filter(function(k){return String(ex.bank[k]||"").length>=20;}).length;
+  const pl=Object.keys(ex.plans||{}).length;
+  const dn=(ex.docs||[]).length;
+  if(!p.company&&!bn&&!pl){ uiAlert("이 계정에는 옮길 데이터가 없습니다.\n\n원본 데이터가 있는 계정(예: 회사 대표 계정)으로 로그인한 뒤 같은 작업을 해주세요."); return; }
+  const ok=await uiConfirm("이 계정에 저장된 데이터를 '"+WS.name+"' 프로젝트로 가져옵니다.\n\n회사명: "+(p.company||"미입력")+"\n업종: "+(p.industry||"-")+"\n데이터뱅크: "+bn+"개 항목\n사업계획서: "+pl+"건 · 학습문서: "+dn+"건\n\n프로젝트의 현재 내용은 덮어써집니다. 진행할까요?","개인 데이터 가져오기");
+  if(!ok) return;
+  PROFILE={company:p.company||"",industry:p.industry||"",founded:p.founded||"",region:p.region||"",staff:p.staff||"",revenue:p.revenue||"",descr:p.descr||"",keywords:Array.isArray(p.keywords)?p.keywords:[],extra:ex};
+  let sc={};
+  try{
+    const {data:ss}=await sb.from("scraps").select("*").eq("user_id",userId);
+    (ss||[]).forEach(function(r){ sc[r.ann_key]={status:r.status||"검토 중",detail:(r.detail&&typeof r.detail==="object")?r.detail:{}}; });
+  }catch(e){}
+  scraps=sc;
+  rescoreAll();
+  await wsSave();
+  await logAct("orgdata","프로젝트 데이터","update","개인 계정 데이터를 프로젝트로 가져왔습니다");
+  uiAlert("'"+WS.name+"' 프로젝트로 가져왔습니다.","완료");
   enterApp();
 }
 async function resetWs(id){
