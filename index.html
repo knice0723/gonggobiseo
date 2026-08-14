@@ -789,7 +789,7 @@ const CONFIG = {
   SUPABASE_URL: "https://wtgfihfsjslnzbjhfijp.supabase.co",        // 예: "https://xxxx.supabase.co"
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0Z2ZpaGZzanNsbnpiamhmaWpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0MjEzMTMsImV4cCI6MjEwMTk5NzMxM30.ho84pGKYPVvIuGyT9C5kGhugsvcAMQwyRVuF6aLhlVw"    // Supabase → Settings → API Keys 의 anon public 키
 };
-
+  
 /* ══ 상태 ══ */
 const DEMO_AUTH = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
 const sb = DEMO_AUTH ? null : window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
@@ -2832,11 +2832,25 @@ async function deepAnalyze(idx){
 let ORG=null, ORG_MEMBERS=[], ORG_LOGS=[], ORG_NOTES={};
 async function loadOrg(){
   if(!sb||!userId) return;
+  const em=(userEmail||"").toLowerCase();
   try{
-    const {data:mine}=await sb.from("org_members").select("org_id,role,status").or("user_id.eq."+userId+",email.eq."+(userEmail||"")).eq("status","active").limit(1);
-    let oid=mine&&mine[0]?mine[0].org_id:null;
+    // ① 나에게 온 초대가 있으면 자동 수락(활성화)
+    if(em){
+      const {data:inv}=await sb.from("org_members").select("id,org_id,status").eq("email",em).neq("status","active");
+      if(inv&&inv.length){
+        for(const r of inv){
+          await sb.from("org_members").update({user_id:userId,status:"active"}).eq("id",r.id);
+        }
+        try{ await sb.from("profiles").update({org_id:inv[0].org_id}).eq("id",userId); }catch(e2){}
+        PENDING_JOIN=true;
+      }
+    }
+    // ② 내가 속한 팀 찾기
+    let oid=null;
+    const {data:mine}=await sb.from("org_members").select("org_id,role,status").eq("status","active").or("user_id.eq."+userId+(em?(",email.eq."+em):"")).limit(1);
+    if(mine&&mine[0]) oid=mine[0].org_id;
     if(!oid){
-      const {data:own}=await sb.from("orgs").select("id,name").eq("owner_id",userId).limit(1);
+      const {data:own}=await sb.from("orgs").select("id").eq("owner_id",userId).limit(1);
       if(own&&own[0]) oid=own[0].id;
     }
     if(!oid){ ORG=null; return; }
@@ -2845,11 +2859,21 @@ async function loadOrg(){
     if(ORG){
       const {data:ms}=await sb.from("org_members").select("*").eq("org_id",ORG.id).order("created_at");
       ORG_MEMBERS=ms||[];
-      myRole=(ORG.owner_id===userId)?"owner":((ORG_MEMBERS.find(function(m){return m.user_id===userId||m.email===userEmail;})||{}).role||"member");
+      myRole=(ORG.owner_id===userId)?"owner":((ORG_MEMBERS.find(function(m){return m.user_id===userId||String(m.email||"").toLowerCase()===em;})||{}).role||"member");
       await loadNotes();
+      if(PENDING_JOIN){
+        PENDING_JOIN=false;
+        setTimeout(function(){
+          showModal({title:"팀에 연결되었습니다",icon:"✓",
+            msg:"'"+ORG.name+"' 팀의 구성원으로 연결되었습니다.\n\n팀 데이터를 가져오면 회사의 사업 프로필·데이터뱅크·사업계획서를 함께 사용할 수 있습니다.",
+            okText:"팀 데이터 가져오기",cancel:true}).then(function(v){ if(v!==null) pullOrgData(); });
+        },1500);
+      }
     }
   }catch(e){ ORG=null; }
 }
+let PENDING_JOIN=false;
+
 let myRole="member";
 async function loadNotes(){
   if(!sb||!ORG) return;
@@ -2869,7 +2893,16 @@ async function renderTeam(){
   el.innerHTML='<div class="panel"><span class="spinner dark"></span> 불러오는 중…</div>';
   await loadOrg();
   if(!ORG){
-    el.innerHTML='<div class="panel"><h3>회사(팀) 만들기</h3>'+
+    let pend="";
+    try{
+      const {data:inv}=await sb.from("org_members").select("org_id,status").eq("email",(userEmail||"").toLowerCase());
+      if(inv&&inv.length){
+        pend='<div class="ai-result" style="margin-bottom:14px;"><b>받은 초대가 있습니다</b>'+
+          '<p style="font-size:12.5px;color:var(--ink-soft);margin-top:6px;line-height:1.6;">초대가 아직 연결되지 않았습니다. 아래 버튼을 눌러 수락하세요. 연결되지 않으면 Supabase에서 <b>팀초대-보정4.sql</b>을 실행했는지 확인해 주세요.</p>'+
+          '<button class="btn btn-seal" style="margin-top:10px;" onclick="acceptInvite()">초대 수락하고 팀 참여</button></div>';
+      }
+    }catch(e){}
+    el.innerHTML=pend+'<div class="panel"><h3>회사(팀) 만들기</h3>'+
       '<p style="font-size:13px;color:var(--ink-soft);line-height:1.75;">회사를 만들면 관리자가 되어 직원을 초대할 수 있습니다. 초대된 구성원은 같은 사업 프로필·데이터뱅크·사업계획서를 공유합니다.</p>'+
       '<div class="field" style="margin-top:14px;"><label>회사 이름</label><input type="text" id="org-name" value="'+esc(PROFILE.company||"")+'" placeholder="예: 엔아이소프트(주)"></div>'+
       '<button class="btn btn-seal" onclick="createOrg()">회사 만들고 관리자 되기</button></div>';
@@ -2913,6 +2946,19 @@ async function renderTeam(){
       }).join(""):'<p class="mini-note">아직 활동 기록이 없습니다.</p>')+
     '</div></div>';
 }
+async function acceptInvite(){
+  const em=(userEmail||"").toLowerCase();
+  const {data:inv,error}=await sb.from("org_members").select("id,org_id").eq("email",em);
+  if(error||!inv||!inv.length){ uiAlert("연결할 초대를 찾지 못했습니다."); return; }
+  for(const r of inv){
+    const {error:e2}=await sb.from("org_members").update({user_id:userId,status:"active"}).eq("id",r.id);
+    if(e2){ uiAlert("초대 수락 실패: "+e2.message+"\n\nSupabase에서 팀초대-보정4.sql을 실행했는지 확인하세요."); return; }
+  }
+  try{ await sb.from("profiles").update({org_id:inv[0].org_id}).eq("id",userId); }catch(e){}
+  await loadOrg();
+  uiAlert("팀에 연결되었습니다.");
+  renderTeam();
+}
 async function createOrg(){
   const nm=document.getElementById("org-name").value.trim();
   if(!nm){ uiAlert("회사 이름을 입력해 주세요."); return; }
@@ -2931,7 +2977,7 @@ async function inviteMember(){
   await logAct("member","구성원","create",em+" 님을 초대했습니다");
   const link=location.origin;
   showModal({title:"초대 등록 완료",icon:"✉",
-    msg:em+" 님을 팀에 등록했습니다.\n\n※ 현재 초대 메일은 자동 발송되지 않습니다. 아래 안내를 직접 전달해 주세요.\n\n──────────\n[공고비서 팀 초대]\n"+ORG.name+" 팀에 초대되었습니다.\n1) "+link+" 접속\n2) "+em+" 이메일로 회원가입\n3) 가입 즉시 팀에 자동 연결됩니다\n──────────",
+    msg:em+" 님을 팀에 등록했습니다.\n\n※ 초대 메일은 자동 발송되지 않습니다. 아래 안내를 복사해 직접 전달해 주세요.\n※ 이미 가입한 계정이면 그 계정으로 로그인 후 [설정 → 팀·협업]에서 '초대 수락'을 누르면 됩니다.\n\n──────────\n[공고비서 팀 초대]\n"+ORG.name+" 팀에 초대되었습니다.\n1) "+link+" 접속\n2) "+em+" 이메일로 회원가입\n3) 가입 즉시 팀에 자동 연결됩니다\n──────────",
     okText:"안내문 복사"}).then(function(){
       navigator.clipboard.writeText("[공고비서 팀 초대]\n"+ORG.name+" 팀에 초대되었습니다.\n1) "+link+" 접속\n2) "+em+" 이메일로 회원가입\n3) 가입 즉시 팀에 자동 연결됩니다").catch(function(){});
     });
