@@ -560,7 +560,7 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     </div>
 
     <div id="view-profile" class="view">
-      <div class="page-head"><h1>사업 프로필 · 문서 학습</h1><p>프로필과 학습된 문서를 바탕으로 공고를 매칭합니다.</p></div>
+      <div class="page-head"><h1>사업 프로필 · 문서 학습 <span id="prof-ws" style="font-size:12px;color:var(--seal);font-weight:600;vertical-align:middle;"></span></h1><p>프로필과 학습된 문서를 바탕으로 공고를 매칭합니다.</p></div>
       <div class="two-col">
         <div class="panel">
           <h3>기본 프로필</h3>
@@ -1553,6 +1553,7 @@ function renderCal(){
 
 /* ══ 프로필 ══ */
 function fillProfileForm(){
+  var _pw=document.getElementById("prof-ws"); if(_pw) _pw.textContent = WS?("· "+WS.name+" 프로젝트"):"";
   document.getElementById("p-company").value=PROFILE.company;
   document.getElementById("p-industry").value=PROFILE.industry;
   document.getElementById("p-founded").value=PROFILE.founded;
@@ -3002,11 +3003,7 @@ async function loadWorkspaces(){
     WS=WSLIST.find(function(o){return o.id===sel;})||WSLIST[0]||null;
     if(WS){
       const st=await wsLoad(true);
-      if(st==="empty"){
-        // 데이터가 없는 프로젝트: 개인 프로필을 초기 데이터로 이관
-        if(PROFILE.company) await wsSave();
-        else { PROFILE=blankProfile(WS.name); }
-      }
+      if(st==="empty"){ PROFILE=blankProfile(WS.name); scraps={}; }  // 절대 자동 복사하지 않음
       startWsPoll();
     }
     renderWsBox();
@@ -3185,7 +3182,10 @@ async function renderTeam(){
       '<div style="width:38px;height:38px;border-radius:10px;background:var(--seal-wash);color:var(--seal-deep);display:flex;align-items:center;justify-content:center;font-weight:800;font-family:var(--serif);">'+esc(String(o.name).charAt(0))+'</div>'+
       '<div style="flex:1;min-width:180px;"><b style="font-size:14px;">'+esc(o.name)+'</b>'+(cur?' <span style="font-size:11px;color:var(--seal);font-weight:700;">· 현재 작업 중</span>':'')+
       '<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px;">'+(o.owner_id===userId?"내가 만든 프로젝트":"참여 중")+'</div></div>'+
-      (cur?'':'<button class="btn" onclick="switchWs(\''+o.id+'\')">이 프로젝트로 전환</button>')+
+      (cur?'':'<button class="btn" onclick="switchWs(\''+o.id+'\')">전환</button>')+
+      (o.owner_id===userId?('<button class="btn" style="font-size:11.5px;" onclick="renameWs(\''+o.id+'\')">이름 변경</button>'+
+        '<button class="btn" style="font-size:11.5px;color:var(--seal);" onclick="resetWs(\''+o.id+'\')">데이터 초기화</button>'+
+        '<button class="btn" style="font-size:11.5px;color:var(--seal);" onclick="deleteWs(\''+o.id+'\')">삭제</button>'):'')+
       '</div>';
   }).join("");
 
@@ -3248,6 +3248,39 @@ async function acceptInvite(){
   try{ await sb.from("profiles").update({org_id:inv[0].org_id}).eq("id",userId); }catch(e){}
   await loadWorkspaces(); await loadOrg();
   uiAlert("팀에 연결되었습니다. 회사 데이터가 자동으로 공유됩니다.","연결 완료");
+  enterApp();
+}
+async function resetWs(id){
+  const o=WSLIST.find(function(x){return x.id===id;}); if(!o) return;
+  const ok=await uiConfirm("'"+o.name+"' 프로젝트의 모든 데이터(프로필·데이터뱅크·사업계획서·스크랩)를 지우고 빈 상태로 되돌립니다.\n\n되돌릴 수 없습니다. 진행할까요?","데이터 초기화");
+  if(!ok) return;
+  const payload={profile:blankProfile(o.name),scraps:{},at:Date.now(),by:userEmail||""};
+  const {error}=await sb.from("org_data").upsert({org_id:o.id,data:payload,updated_at:new Date().toISOString(),updated_by:userEmail||""});
+  if(error){ uiAlert("초기화 실패: "+error.message); return; }
+  if(WS&&WS.id===id){ PROFILE=blankProfile(o.name); scraps={}; WS_AT=Date.now(); rescoreAll(); }
+  await logAct("org","프로젝트","delete","'"+o.name+"' 데이터를 초기화했습니다");
+  uiAlert("'"+o.name+"' 프로젝트를 빈 상태로 초기화했습니다.","완료");
+  renderTeam();
+  if(WS&&WS.id===id) setTimeout(function(){ go("profile"); },600);
+}
+async function renameWs(id){
+  const o=WSLIST.find(function(x){return x.id===id;}); if(!o) return;
+  const nm=await uiPrompt("새 프로젝트 이름을 입력하세요.",o.name,"이름 변경");
+  if(!nm||!nm.trim()) return;
+  const {error}=await sb.from("orgs").update({name:nm.trim()}).eq("id",id);
+  if(error){ uiAlert("변경 실패: "+error.message); return; }
+  await loadWorkspaces(); renderTeam();
+}
+async function deleteWs(id){
+  const o=WSLIST.find(function(x){return x.id===id;}); if(!o) return;
+  const ok=await uiConfirm("'"+o.name+"' 프로젝트를 완전히 삭제합니다.\n구성원·데이터·이력이 모두 사라지며 되돌릴 수 없습니다.\n\n삭제할까요?","프로젝트 삭제");
+  if(!ok) return;
+  const {error}=await sb.from("orgs").delete().eq("id",id);
+  if(error){ uiAlert("삭제 실패: "+error.message); return; }
+  try{ if(localStorage.getItem(wsKey())===id) localStorage.removeItem(wsKey()); }catch(e){}
+  WS=null; await loadWorkspaces(); await loadOrg();
+  uiAlert("삭제했습니다.","완료");
+  if(WS){ await wsLoad(true); } else { PROFILE=blankProfile(""); scraps={}; }
   enterApp();
 }
 async function createOrg(){
