@@ -331,6 +331,22 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
 </head>
 <body>
 
+<div id="modal-wrap" class="hidden" style="position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;">
+  <div style="position:absolute;inset:0;background:rgba(28,26,23,.45);backdrop-filter:blur(2px);" onclick="modalCancel()"></div>
+  <div id="modal-box" style="position:relative;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.22);max-width:460px;width:100%;padding:26px 28px 22px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <div id="modal-icon" style="width:34px;height:34px;border-radius:99px;background:var(--seal-wash);color:var(--seal-deep);display:flex;align-items:center;justify-content:center;font-size:16px;">告</div>
+      <b id="modal-title" style="font-family:var(--serif);font-size:16px;">알림</b>
+    </div>
+    <div id="modal-msg" style="font-size:13.5px;color:var(--ink-soft);line-height:1.75;white-space:pre-wrap;"></div>
+    <input type="text" id="modal-input" class="hidden" style="width:100%;margin-top:14px;">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn hidden" id="modal-no" onclick="modalCancel()">취소</button>
+      <button class="btn btn-seal" id="modal-yes" onclick="modalOk()">확인</button>
+    </div>
+  </div>
+</div>
+
 <div id="boot" style="position:fixed;inset:0;background:var(--paper);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
   <div class="logo-seal" style="width:54px;height:54px;font-size:25px;">고</div>
   <div class="spinner dark"></div>
@@ -778,48 +794,64 @@ let PROFILE = {
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function mdLite(t){return esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/^#{2,3} (.+)$/gm,"<b>$1</b>");}
 function mdDiagram(title,lines){
-  const nodes=[], edges=[];
-  lines.forEach(function(l){
-    const t=l.trim(); if(!t) return;
-    if(t.indexOf("->")>=0||t.indexOf("→")>=0){
-      const parts=t.split(/->|→/).map(function(x){return x.trim();}).filter(Boolean);
-      for(let i=0;i<parts.length;i++){ if(nodes.indexOf(parts[i])<0) nodes.push(parts[i]); if(i>0) edges.push([parts[i-1],parts[i]]); }
-    } else { const nm=t.replace(/^[-•*]\s*/,"").trim(); if(nm&&nodes.indexOf(nm)<0) nodes.push(nm); }
-  });
-  if(!nodes.length) return "";
-  const W=760, bw=150, bh=52, gapX=40, gapY=34;
-  const perRow=Math.min(4,Math.max(1,Math.ceil(Math.sqrt(nodes.length))>3?4:nodes.length));
-  const rows=Math.ceil(nodes.length/perRow);
-  const H=rows*(bh+gapY)+40;
-  const pos={};
-  let svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;background:#fff;border:1px solid #e5e0d8;border-radius:8px;margin:10px 0;">';
-  svg+='<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#8a2b2b"/></marker></defs>';
-  svg+='<text x="14" y="22" style="font:700 13px sans-serif;fill:#2c2a26;">'+esc(title||"구성도")+'</text>';
-  nodes.forEach(function(n,i){
-    const r=Math.floor(i/perRow), c=i%perRow;
-    const cnt=Math.min(perRow,nodes.length-r*perRow);
-    const totalW=cnt*bw+(cnt-1)*gapX;
-    const x=(W-totalW)/2+c*(bw+gapX), y=40+r*(bh+gapY);
-    pos[n]={x:x,y:y,w:bw,h:bh};
-    svg+='<rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+bh+'" rx="8" fill="#faf8f4" stroke="#b22222" stroke-width="1.4"/>';
-    const words=String(n).slice(0,34);
-    const half=words.length>16?Math.ceil(words.length/2):0;
-    if(half){
-      svg+='<text x="'+(x+bw/2)+'" y="'+(y+bh/2-4)+'" text-anchor="middle" style="font:600 11.5px sans-serif;fill:#2c2a26;">'+esc(words.slice(0,half))+'</text>';
-      svg+='<text x="'+(x+bw/2)+'" y="'+(y+bh/2+12)+'" text-anchor="middle" style="font:600 11.5px sans-serif;fill:#2c2a26;">'+esc(words.slice(half))+'</text>';
+  // esc() 이후 들어오므로 엔티티 복원 후 파싱
+  const dec=function(s){ return String(s).replace(/&gt;/g,">").replace(/&lt;/g,"<").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'"); };
+  const seq=[], flat=[];
+  lines.forEach(function(raw){
+    const t=dec(raw).trim(); if(!t) return;
+    if(/(->|→|⇒|=>)/.test(t)){
+      const parts=t.split(/\s*(?:->|→|⇒|=>)\s*/).map(function(x){return x.replace(/^[-•*ㅇ]\s*/,"").trim();}).filter(Boolean);
+      if(parts.length>1) seq.push(parts); else if(parts[0]) flat.push(parts[0]);
     } else {
-      svg+='<text x="'+(x+bw/2)+'" y="'+(y+bh/2+4)+'" text-anchor="middle" style="font:600 12px sans-serif;fill:#2c2a26;">'+esc(words)+'</text>';
+      const nm=t.replace(/^[-•*ㅇ○◦\d.)]+\s*/,"").trim();
+      if(nm) flat.push(nm);
     }
   });
-  edges.forEach(function(e){
-    const a=pos[e[0]], b=pos[e[1]]; if(!a||!b) return;
-    let x1,y1,x2,y2;
-    if(Math.abs(a.y-b.y)<2){ if(a.x<b.x){x1=a.x+a.w;y1=a.y+a.h/2;x2=b.x;y2=y1;} else {x1=a.x;y1=a.y+a.h/2;x2=b.x+b.w;y2=y1;} }
-    else { x1=a.x+a.w/2; y1=a.y+a.h; x2=b.x+b.w/2; y2=b.y; }
-    svg+='<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#8a2b2b" stroke-width="1.6" marker-end="url(#ar)"/>';
+  if(!seq.length&&!flat.length) return "";
+  const esc2=function(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
+  const wrap=function(s,per){ const out=[]; let cur=""; String(s).split(/\s+/).forEach(function(w){ if((cur+" "+w).trim().length>per){ out.push(cur.trim()); cur=w; } else cur+=" "+w; }); if(cur.trim())out.push(cur.trim()); return out.slice(0,3); };
+  const W=880, PAD=26, TH=title?42:16;
+  const bw=176, bh=62, gx=54, gy=40;
+  let rows=[];
+  if(seq.length){ seq.forEach(function(s){ // 한 줄에 4개 초과 시 접기
+      for(let i=0;i<s.length;i+=4) rows.push({items:s.slice(i,i+4),chain:true});
+    }); }
+  if(flat.length){ for(let i=0;i<flat.length;i+=3) rows.push({items:flat.slice(i,i+3),chain:false}); }
+  const H=TH+rows.length*(bh+gy)+PAD;
+  let svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:linear-gradient(180deg,#fffefb,#faf8f4);border:1px solid #e8e2d8;border-radius:10px;margin:14px 0;">';
+  svg+='<defs><marker id="dgar" markerWidth="10" markerHeight="10" refX="9" refY="3.2" orient="auto"><path d="M0,0 L0,6.4 L9,3.2 z" fill="#b22222"/></marker>'+
+    '<linearGradient id="dgbx" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#fdf6f2"/></linearGradient>'+
+    '<filter id="dgsh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#8a2b2b" flood-opacity="0.13"/></filter></defs>';
+  if(title){
+    svg+='<text x="'+PAD+'" y="27" style="font:800 15px \'Noto Serif KR\',serif;fill:#2c2a26;">'+esc2(dec(title))+'</text>';
+    svg+='<line x1="'+PAD+'" y1="34" x2="'+(W-PAD)+'" y2="34" stroke="#eee6da" stroke-width="1"/>';
+  }
+  rows.forEach(function(row,ri){
+    const n=row.items.length;
+    const totalW=n*bw+(n-1)*gx;
+    const startX=(W-totalW)/2;
+    const y=TH+ri*(bh+gy);
+    row.items.forEach(function(nm,i){
+      const x=startX+i*(bw+gx);
+      svg+='<rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+bh+'" rx="11" fill="url(#dgbx)" stroke="#b22222" stroke-width="1.5" filter="url(#dgsh)"/>';
+      const ls=wrap(nm,14);
+      const startY=y+bh/2-((ls.length-1)*7.5)+4.5;
+      ls.forEach(function(l,li){
+        svg+='<text x="'+(x+bw/2)+'" y="'+(startY+li*15)+'" text-anchor="middle" style="font:600 12px \'Pretendard\',sans-serif;fill:#2c2a26;">'+esc2(l)+'</text>';
+      });
+      if(row.chain&&i<n-1){
+        const ax=x+bw+6, ay=y+bh/2;
+        svg+='<line x1="'+ax+'" y1="'+ay+'" x2="'+(ax+gx-14)+'" y2="'+ay+'" stroke="#b22222" stroke-width="1.8" marker-end="url(#dgar)"/>';
+      }
+    });
+    if(row.chain&&ri<rows.length-1&&rows[ri+1].chain){
+      const cx=W/2, y1=y+bh+4, y2=y+bh+gy-6;
+      svg+='<line x1="'+cx+'" y1="'+y1+'" x2="'+cx+'" y2="'+y2+'" stroke="#b22222" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#dgar)"/>';
+    }
   });
   return svg+'</svg>';
 }
+
 function mdTable(lines){
   const rows=lines.map(function(l){return l.trim().replace(/^\||\|$/g,"").split("|").map(function(c){return c.trim();});});
   const head=rows[0], body=rows.slice(2);
@@ -1471,7 +1503,7 @@ function renderLearnedDoc(){
     '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><button class="btn btn-primary" id="apply-learn-btn" onclick="applyLearnedToProfile()" style="font-size:12px;">학습 내용으로 프로필 자동 업데이트</button><button class="btn" onclick="resetLearning()" style="font-size:12px;">학습 초기화</button><span class="mini-note" style="margin:0;">새 문서를 분석하면 기존 학습 내용과 자동으로 통합됩니다.</span></div></div>';
 }
 async function resetLearning(){
-  if(!confirm("학습된 문서 내용을 모두 지울까요? 프로필 기본 정보는 유지됩니다.")) return;
+  if(!await uiConfirm("학습된 문서 내용을 모두 지울까요? 프로필 기본 정보는 유지됩니다.")) return;
   PROFILE.extra=PROFILE.extra||{};
   delete PROFILE.extra.learned; delete PROFILE.extra.doc; PROFILE.extra.docs=[];
   await saveProfileRemote(); renderLearnedDoc();
@@ -1536,6 +1568,40 @@ async function callClaude(messages,maxTokens){
   const d=await r.json();
   return d.content.filter(b=>b.type==="text").map(b=>b.text).join("\n");
 }
+let _modalCb=null;
+function showModal(opt){
+  return new Promise(function(resolve){
+    const w=document.getElementById("modal-wrap");
+    document.getElementById("modal-title").textContent=opt.title||"알림";
+    document.getElementById("modal-msg").innerHTML=String(opt.msg||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\n/g,"<br>");
+    document.getElementById("modal-icon").textContent=opt.icon||"告";
+    const inp=document.getElementById("modal-input");
+    if(opt.input!==undefined){ inp.classList.remove("hidden"); inp.value=opt.input||""; inp.placeholder=opt.placeholder||""; setTimeout(function(){inp.focus();},60); }
+    else inp.classList.add("hidden");
+    document.getElementById("modal-no").classList.toggle("hidden",!opt.cancel);
+    document.getElementById("modal-yes").textContent=opt.okText||"확인";
+    w.classList.remove("hidden");
+    _modalCb=resolve;
+  });
+}
+function modalOk(){
+  const inp=document.getElementById("modal-input");
+  const v=inp.classList.contains("hidden")?true:inp.value;
+  document.getElementById("modal-wrap").classList.add("hidden");
+  if(_modalCb){ const c=_modalCb; _modalCb=null; c(v); }
+}
+function modalCancel(){
+  document.getElementById("modal-wrap").classList.add("hidden");
+  if(_modalCb){ const c=_modalCb; _modalCb=null; c(null); }
+}
+function uiAlert(msg,title){ return showModal({msg:msg,title:title||"안내"}); }
+function uiConfirm(msg,title){ return showModal({msg:msg,title:title||"확인",cancel:true}).then(function(v){return v!==null;}); }
+function uiPrompt(msg,def,title){ return showModal({msg:msg,title:title||"입력",cancel:true,input:def||""}); }
+document.addEventListener("keydown",function(e){
+  if(document.getElementById("modal-wrap").classList.contains("hidden")) return;
+  if(e.key==="Enter"){ e.preventDefault(); modalOk(); }
+  if(e.key==="Escape"){ modalCancel(); }
+});
 function parseJson(raw){
   let t=String(raw||"").replace(/```json|```/g,"").trim();
   const i=t.indexOf("{"), j=t.lastIndexOf("}");
@@ -1604,7 +1670,7 @@ function openGuide(idx){
     document.getElementById("gen-guide").onclick=async function(){
       this.disabled=true; this.innerHTML='<span class="spinner"></span> 분석 중…';
       try{
-        const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[지원사업 공고]\n"+a.title+"\n주관: "+a.agency+"\n요약: "+a.summary+"\n마감: "+a.deadlineText+"\n\n위 회사가 이 공고 지원을 검토 중이다. 다음 4개 섹션으로 한국어 답변: ## 평가 포인트(2~3문장) ## 추천 목차(4~5개 항목, 각 한 줄) ## 내 프로필 기반 전략(3~4문장, 회사 강점 활용) ## 주의사항(2~3개). 확실치 않은 규정은 원문 확인을 권고할 것. 전체 500자 내외."}],1200);
+        const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[지원사업 공고]\n"+a.title+"\n주관: "+a.agency+"\n요약: "+a.summary+"\n마감: "+a.deadlineText+"\n\n위 회사가 이 공고 지원을 검토 중이다. 다음 4개 섹션으로 한국어 답변: ## 평가 포인트(2~3문장) ## 추천 목차(4~5개 항목, 각 한 줄) ## 내 프로필 기반 전략(3~4문장, 회사 강점 활용) ## 주의사항(2~3개). 확실치 않은 규정은 원문 확인을 권고할 것. 전체 500자 내외."}],3000);
         const html='<div class="guide-sec"><div class="draft-out">'+mdLite(raw)+'</div><p class="mini-note">AI 분석은 참고용입니다. 평가 기준과 자격은 원문 공고가 우선합니다.</p></div>';
         guideCache[a.key]=html;
         document.getElementById("guide-out").innerHTML=html;
@@ -1631,12 +1697,12 @@ async function genDraftAgent(a, btn){
   const base=profileContext()+"\n\n[지원사업 공고]\n"+a.title+"\n주관: "+a.agency+"\n요약: "+a.summary+"\n마감: "+a.deadlineText;
   try{
     log("① 1차 초안 작성 중…");
-    let draft=await callClaude([{role:"user",content:base+"\n\n위 회사가 이 공고에 지원한다고 가정하고 사업계획서 핵심 파트 초안을 작성해라. 형식: ## 섹션 헤더 4개(문제인식 / 솔루션·차별성 / 시장·성장전략 / 자금 사용계획), 각 4~6문장. 프로필의 실제 수치·연혁·강점을 최대한 활용하고, 심사위원이 확인할 정량 지표는 [예: 월 신규고객 10개사]처럼 대괄호로 제안. 한국어 700자 내외."}],2000);
+    let draft=await callClaude([{role:"user",content:base+"\n\n위 회사가 이 공고에 지원한다고 가정하고 사업계획서 핵심 파트 초안을 작성해라. 형식: ## 섹션 헤더 4개(문제인식 / 솔루션·차별성 / 시장·성장전략 / 자금 사용계획), 각 4~6문장. 프로필의 실제 수치·연혁·강점을 최대한 활용하고, 심사위원이 확인할 정량 지표는 [예: 월 신규고객 10개사]처럼 대괄호로 제안. 한국어 700자 내외."}],6000);
     let score=0, iter=0, feedback="";
     while(iter<3){
       iter++;
       log("② 심사위원 AI 검수 "+iter+"회차…");
-      const ev=await callClaude([{role:"user",content:"너는 정부지원사업 서면평가 심사위원이다. 공고 적합성, 구체성(수치·근거), 실현 가능성, 설득력을 냉정하게 평가해라. 반드시 JSON만 출력: {\"score\": 0~100 정수, \"feedback\": \"점수를 올리기 위해 반드시 고쳐야 할 3가지, 구체적으로\"}\n\n"+base+"\n\n[사업계획서 초안]\n"+draft}],700);
+      const ev=await callClaude([{role:"user",content:"너는 정부지원사업 서면평가 심사위원이다. 공고 적합성, 구체성(수치·근거), 실현 가능성, 설득력을 냉정하게 평가해라. 반드시 JSON만 출력: {\"score\": 0~100 정수, \"feedback\": \"점수를 올리기 위해 반드시 고쳐야 할 3가지, 구체적으로\"}\n\n"+base+"\n\n[사업계획서 초안]\n"+draft}],2000);
       let pj={score:0,feedback:""};
       try{ const mm=ev.replace(/```json|```/g,"").match(/\{[\s\S]*\}/); pj=JSON.parse(mm?mm[0]:ev); }catch(e){}
       score=Math.round(Number(pj.score)||0); feedback=pj.feedback||"";
@@ -1644,7 +1710,7 @@ async function genDraftAgent(a, btn){
       if(score>=95) break;
       if(iter>=3){ log("&nbsp;&nbsp;→ 검수 3회 완료 — 현재 최고본으로 마무리합니다"); break; }
       log("③ 피드백을 반영해 보완 중…");
-      draft=await callClaude([{role:"user",content:base+"\n\n[기존 초안]\n"+draft+"\n\n[심사위원 피드백]\n"+(feedback||"전반적 완성도 개선")+"\n\n피드백을 모두 반영해 초안을 다시 작성해라. 형식(## 섹션 4개)은 동일하게 유지하고, 지적된 부분을 구체적 수치와 근거로 보강해라."}],2000);
+      draft=await callClaude([{role:"user",content:base+"\n\n[기존 초안]\n"+draft+"\n\n[심사위원 피드백]\n"+(feedback||"전반적 완성도 개선")+"\n\n피드백을 모두 반영해 초안을 다시 작성해라. 형식(## 섹션 4개)은 동일하게 유지하고, 지적된 부분을 구체적 수치와 근거로 보강해라."}],6000);
     }
     document.getElementById("agent-out").innerHTML='<div class="sec-title" style="margin-top:16px;">최종 초안 · 검수 '+score+'점</div><div class="draft-out">'+mdLite(draft)+'</div><p class="mini-note">AI 심사위원의 자동 검수를 거친 초안입니다. 수치와 사실관계를 확인한 뒤 공고 양식에 맞춰 다듬으세요.</p>';
     btn.textContent="다시 생성";
@@ -1678,7 +1744,7 @@ function openChat(idx){
 }
 function quickAsk(q){document.getElementById("chat-input").value=q;sendChat();}
 async function clearChat(){
-  if(!confirm("대화 기록을 모두 지울까요?")) return;
+  if(!await uiConfirm("대화 기록을 모두 지울까요?")) return;
   chatHistory=[];
   PROFILE.extra=PROFILE.extra||{}; PROFILE.extra.chat=[];
   await saveProfileRemote();
@@ -1723,7 +1789,7 @@ async function analyzeOne(source, prevLearned){
     if(source.file) txt=await source.file.text();
     content=prompt+"\n\n[문서 내용]\n"+txt.slice(0,20000);
   }
-  const raw=await callClaude([{role:"user",content:content}],1200);
+  const raw=await callClaude([{role:"user",content:content}],3000);
   const cleaned=raw.replace(/```json|```/g,"").trim();
   const mjson=cleaned.match(/\{[\s\S]*\}/);
   return JSON.parse(mjson?mjson[0]:cleaned);
@@ -1898,22 +1964,22 @@ async function genAdminPlan(){
   const btn=document.getElementById("ap-admin-btn");
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 수행 절차 정리 중…';
   try{
-    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[선정된 지원사업]\n"+a.title+"\n주관: "+a.agency+"\n수행기관: "+(d.agency||"미정")+"\n협약기간: "+(d.period||"미정")+"\n지원금: "+(d.fund||"미정")+"\n\n너는 정부지원사업 수행 관리 전문가다. 이 사업에 선정된 기업이 협약부터 정산·최종보고까지 반드시 처리해야 할 행정 업무를 시간순으로 정리해라. 한국 정부지원사업의 실제 절차(협약체결, 사업비 카드 발급, 집행 증빙, 중간보고, 변경신청, 최종보고, 정산, 기술료 등) 기준으로.\n반드시 JSON만 출력: {\"tasks\":[{\"phase\":\"협약|집행|보고|정산\",\"name\":\"업무명(구체적으로)\",\"due\":\"YYYY.MM.DD 또는 빈문자열\",\"docs\":\"필요 서류\",\"done\":false} 10~16개],\"tips\":\"실수하기 쉬운 정산 주의사항 2~3가지\"}"}],1800);
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[선정된 지원사업]\n"+a.title+"\n주관: "+a.agency+"\n수행기관: "+(d.agency||"미정")+"\n협약기간: "+(d.period||"미정")+"\n지원금: "+(d.fund||"미정")+"\n\n너는 정부지원사업 수행 관리 전문가다. 이 사업에 선정된 기업이 협약부터 정산·최종보고까지 반드시 처리해야 할 행정 업무를 시간순으로 정리해라. 한국 정부지원사업의 실제 절차(협약체결, 사업비 카드 발급, 집행 증빙, 중간보고, 변경신청, 최종보고, 정산, 기술료 등) 기준으로.\n반드시 JSON만 출력: {\"tasks\":[{\"phase\":\"협약|집행|보고|정산\",\"name\":\"업무명(구체적으로)\",\"due\":\"YYYY.MM.DD 또는 빈문자열\",\"docs\":\"필요 서류\",\"done\":false} 10~16개],\"tips\":\"실수하기 쉬운 정산 주의사항 2~3가지\"}"}],5000);
     const j=parseJson(raw);
     d.admin={tasks:(j.tasks||[]).slice(0,18),tips:j.tips||"",at:fmtDate(new Date())};
     await saveApply(false);
     renderApplyPage();
-    if(j.tips) setTimeout(function(){ alert("정산 주의사항\n\n"+j.tips); },300);
-  }catch(e){ alert("체크리스트 생성에 실패했습니다."); }
+    if(j.tips) setTimeout(function(){ uiAlert("정산 주의사항\n\n"+j.tips); },300);
+  }catch(e){ uiAlert("체크리스트 생성에 실패했습니다."); }
   btn.disabled=false;
 }
 async function genReportDraft(){
   const a=ANNS[applyIdx]; const d=scrapOf(applyKey).detail;
-  const kind=prompt("어떤 보고서 초안이 필요하신가요?\n\n1 = 중간보고서\n2 = 최종결과보고서\n3 = 변경신청서\n\n번호를 입력하세요","1");
+  const kind=await uiPrompt("어떤 보고서 초안이 필요하신가요?\n\n1 = 중간보고서\n2 = 최종결과보고서\n3 = 변경신청서\n\n번호를 입력하세요","1");
   if(!kind) return;
   const names={"1":"중간보고서","2":"최종결과보고서","3":"사업변경 신청서"};
   const nm=names[kind.trim()]||"중간보고서";
-  alert(nm+" 초안을 작성합니다. 완료되면 파일로 내려받습니다.");
+  uiAlert(nm+" 초안을 작성합니다. 완료되면 파일로 내려받습니다.");
   try{
     const raw=await callClaude([{role:"user",content:bankContext()+"\n\n"+profileContext()+"\n\n[수행 중인 지원사업]\n"+a.title+"\n수행기관: "+(d.agency||"")+" / 협약기간: "+(d.period||"")+" / 지원금: "+(d.fund||"")+"\n수행일정: "+(d.mile||"")+"\n\n위 사업의 "+nm+" 초안을 작성해라. 한국 정부지원사업 표준 양식 기준. 실제 성과 수치는 데이터뱅크에 있는 것만 쓰고, 없으면 [입력 필요: 항목]으로 표시. 구성: ■ 사업 개요 / ■ 추진 실적 / ■ 목표 대비 달성도 / ■ 사업비 집행 현황 / ■ 향후 계획 / ■ 애로사항. 1200자 내외."}],2400);
     const html2='<html><head><meta charset="utf-8"></head><body style="font-family:\'Malgun Gothic\',sans-serif;font-size:11pt;line-height:1.8;"><h1 style="font-size:18pt;text-align:center;">'+esc(nm)+'</h1><p style="text-align:center;color:#666;font-size:10pt;">'+esc(a.title)+' · '+esc(PROFILE.company||"")+'</p><div style="white-space:pre-wrap;margin-top:20px;">'+esc(raw)+'</div></body></html>';
@@ -1921,7 +1987,7 @@ async function genReportDraft(){
     const url=URL.createObjectURL(blob);
     const el2=document.createElement("a"); el2.href=url; el2.download=(PROFILE.company||"보고서")+"_"+nm+".doc";
     document.body.appendChild(el2); el2.click(); el2.remove(); URL.revokeObjectURL(url);
-  }catch(e){ alert("보고서 초안 작성에 실패했습니다."); }
+  }catch(e){ uiAlert("보고서 초안 작성에 실패했습니다."); }
 }
 function planFromApply(){
   const a=ANNS[applyIdx];
@@ -1931,7 +1997,7 @@ function planFromApply(){
   if(found){ openPlan(found); } else { newPlan(applyIdx); }
 }
 async function cancelApply(){
-  if(!confirm("이 공고를 지원 현황에서 빼고 스크랩으로 되돌릴까요? 올린 파일과 기록은 유지됩니다.")) return;
+  if(!await uiConfirm("이 공고를 지원 현황에서 빼고 스크랩으로 되돌릴까요? 올린 파일과 기록은 유지됩니다.")) return;
   const sc=scrapOf(applyKey); sc.detail.applied=false;
   await saveApply(false);
   go("bookmark");
@@ -1956,7 +2022,7 @@ async function apPrev(kind,i){
   const f=fileOf(kind,i); if(!f||!sb) return;
   const {data,error}=await sb.storage.from("apply-docs").createSignedUrl(f.path,3600);
   if(data&&data.signedUrl) window.open(data.signedUrl,"_blank");
-  else alert("미리보기를 열 수 없습니다."+(error?" "+error.message:""));
+  else uiAlert("미리보기를 열 수 없습니다."+(error?" "+error.message:""));
 }
 async function apDown(kind,i){
   const f=fileOf(kind,i); if(!f||!sb) return;
@@ -1964,12 +2030,12 @@ async function apDown(kind,i){
   if(data&&data.signedUrl){
     const aEl=document.createElement("a"); aEl.href=data.signedUrl; aEl.download=f.name;
     document.body.appendChild(aEl); aEl.click(); aEl.remove();
-  } else alert("다운로드에 실패했습니다."+(error?" "+error.message:""));
+  } else uiAlert("다운로드에 실패했습니다."+(error?" "+error.message:""));
 }
 async function apUpload(kind,input){
   const files=Array.prototype.slice.call(input.files||[]); input.value="";
   if(!files.length) return;
-  if(!sb||!userId){ alert("파일 저장은 로그인 후 가능합니다."); return; }
+  if(!sb||!userId){ uiAlert("파일 저장은 로그인 후 가능합니다."); return; }
   const safeKey=String(applyKey).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,40)||"ann";
   const d=scrapOf(applyKey).detail; d[kind]=d[kind]||[];
   const failed=[];
@@ -1987,16 +2053,16 @@ async function apUpload(kind,input){
     d[kind].push({name:f.name,path:path});
   }
   await saveApply(false); renderApplyFiles();
-  if(failed.length) alert("일부 파일 업로드 실패:\n"+failed.join("\n"));
+  if(failed.length) uiAlert("일부 파일 업로드 실패:\n"+failed.join("\n"));
 }
 async function apOpen(path){
   if(!sb) return;
   const {data,error}=await sb.storage.from("apply-docs").createSignedUrl(path,3600);
   if(data&&data.signedUrl) window.open(data.signedUrl,"_blank");
-  else alert("파일을 열 수 없습니다."+(error?" "+error.message:""));
+  else uiAlert("파일을 열 수 없습니다."+(error?" "+error.message:""));
 }
 async function apDel(kind,i){
-  if(!confirm("이 파일을 삭제할까요?")) return;
+  if(!await uiConfirm("이 파일을 삭제할까요?")) return;
   const d=scrapOf(applyKey).detail; const f=(d[kind]||[])[i]; if(!f) return;
   if(sb){ try{ await sb.storage.from("apply-docs").remove([f.path]); }catch(e){} }
   d[kind].splice(i,1);
@@ -2150,12 +2216,12 @@ function renderProfileHint(){
 async function applyLearnedToProfile(){
   const ex=PROFILE.extra||{};
   const d=ex.learned||ex.doc;
-  if(!d){ alert("먼저 문서를 학습시켜 주세요."); return; }
-  if(!confirm("학습된 내용을 바탕으로 프로필(사업 소개·주요 제품·타깃 고객·필요 지원·보유 인증)을 AI가 다듬어 채웁니다. 기존 값이 더 구체적인 항목은 유지됩니다. 진행할까요?")) return;
+  if(!d){ uiAlert("먼저 문서를 학습시켜 주세요."); return; }
+  if(!await uiConfirm("학습된 내용을 바탕으로 프로필(사업 소개·주요 제품·타깃 고객·필요 지원·보유 인증)을 AI가 다듬어 채웁니다. 기존 값이 더 구체적인 항목은 유지됩니다. 진행할까요?")) return;
   const btn=document.getElementById("apply-learn-btn");
   if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 프로필 작성 중…'; }
   try{
-    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[학습된 문서 종합]\n"+JSON.stringify(d)+"\n\n학습 내용을 반영해 프로필 항목을 개선해라. 반드시 JSON만 출력: {\"descr\":\"사업 소개 3~4문장\",\"products\":\"주요 제품·서비스 한 줄\",\"target\":\"타깃 고객 한 줄\",\"needs\":\"필요한 지원 유형 한 줄\",\"certs\":\"보유 인증·특허 한 줄(문서에 근거 있을 때만, 없으면 빈 문자열)\"} 기존 값이 이미 더 구체적이면 그 값을 유지해서 출력."}],900);
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[학습된 문서 종합]\n"+JSON.stringify(d)+"\n\n학습 내용을 반영해 프로필 항목을 개선해라. 반드시 JSON만 출력: {\"descr\":\"사업 소개 3~4문장\",\"products\":\"주요 제품·서비스 한 줄\",\"target\":\"타깃 고객 한 줄\",\"needs\":\"필요한 지원 유형 한 줄\",\"certs\":\"보유 인증·특허 한 줄(문서에 근거 있을 때만, 없으면 빈 문자열)\"} 기존 값이 이미 더 구체적이면 그 값을 유지해서 출력."}],6000);
     const mm=raw.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
     const r=JSON.parse(mm?mm[0]:raw);
     if(r.descr) PROFILE.descr=r.descr;
@@ -2168,7 +2234,7 @@ async function applyLearnedToProfile(){
     await saveProfileRemote(); rescoreAll(); fillProfileForm(); setTimeout(aiRerank,600);
     markRoadmapStale();
   const m=document.getElementById("p-save-msg"); if(m){ m.textContent="학습 내용이 프로필에 반영되었습니다 ✓"; setTimeout(function(){m.textContent="";},4000); }
-  }catch(e){ alert("프로필 업데이트에 실패했습니다. 잠시 후 다시 시도해 주세요."); }
+  }catch(e){ uiAlert("프로필 업데이트에 실패했습니다. 잠시 후 다시 시도해 주세요."); }
   if(btn){ btn.disabled=false; btn.textContent="학습 내용으로 프로필 자동 업데이트"; }
 }
 
@@ -2252,7 +2318,7 @@ function certGuideCustom(i){
 }
 async function discoverCerts(){
   const btn=document.getElementById("cert-discover-btn");
-  if(!PROFILE.company){ alert("먼저 사업 프로필을 등록해 주세요."); return; }
+  if(!PROFILE.company){ uiAlert("먼저 사업 프로필을 등록해 주세요."); return; }
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 숨은 제도 발굴 중…';
   let raw="";
   try{
@@ -2277,8 +2343,8 @@ async function discoverCerts(){
     btn.textContent="🔎 다시 발굴";
   }catch(e){
     const d=errDetail(e);
-    if(d) alert("발굴 실패 — AI 서버 오류\n\n"+d.slice(0,200));
-    else alert("발굴에 실패했습니다.\n\nAI가 보낸 응답:\n"+String(raw||"(응답 없음)").slice(0,300)+"\n\n알림 설정에서 다른 AI 모델로 바꿔 시도해 보세요.");
+    if(d) uiAlert("발굴 실패 — AI 서버 오류\n\n"+d.slice(0,200));
+    else uiAlert("발굴에 실패했습니다.\n\nAI가 보낸 응답:\n"+String(raw||"(응답 없음)").slice(0,300)+"\n\n알림 설정에서 다른 AI 모델로 바꿔 시도해 보세요.");
     btn.textContent="🔎 우리 회사 맞춤 숨은 제도 AI 발굴";
   }
   btn.disabled=false;
@@ -2294,6 +2360,7 @@ function showRoadmap(){
 function markRoadmapStale(){
   if(PROFILE.extra&&PROFILE.extra.roadmap) PROFILE.extra.roadmap.stale=true;
 }
+const RM_PERSONA="너는 맥킨지·BCG를 거쳐 한국 중소벤처기업 300여 곳을 매출 100억 이상으로 성장시킨 최고의 성장 전략 컨설턴트다. 위 회사의 전담 컨설턴트로서 답한다.\n\n절대 규칙:\n- 위에 제공된 프로필과 데이터뱅크의 사실만 근거로 판단한다. 없는 정보를 지어내지 않는다.\n- 일반론 금지. 이 회사의 업종·제품·매출·인력·기술을 구체적으로 언급하며 조언한다.\n- 수치와 실제 한국 제도명(벤처확인, 기업부설연구소, 이노비즈, TIPS, 정책자금, 수출바우처 등)을 사용한다.\n- 형식: 마크다운. ## 소제목으로 구분하고 항목은 '- ' 불릿. 표가 필요하면 마크다운 표 사용.";
 const RM_STAGES=[
  {k:"now", n:"현재 진단", inst:"현재 위치를 냉정하게 진단: 강점 3가지(근거와 함께), 결정적 약점 3가지, 동종업계 대비 위치, 지금 당장 손봐야 할 것 1가지. 데이터뱅크에 없어서 판단이 불가한 부분은 '확인 필요: 항목'으로 명시."},
  {k:"y1", n:"1~2년차", inst:"목표 매출과 근거, 핵심 과제 4가지(각각 실행 방법·필요 자원·성공 지표), 확보할 인증·제도 3가지와 시기, 노려야 할 정부지원사업 유형, 조직 구성 목표, 예상 리스크와 대응."},
@@ -2313,19 +2380,40 @@ function showRoadmapV3(){
     const has=!!rm.stages[s.k];
     return '<button class="tab '+(s.k===rm.sel?"active":"")+'" '+(has?"":'style="opacity:.45;"')+' onclick="rmTab(\''+s.k+'\')">'+s.n+(has?"":" ·")+'</button>';
   }).join("");
-  body.innerHTML=rm.stages[rm.sel]?mdRich(rm.stages[rm.sel]):'<div class="empty" style="padding:26px;">이 구간은 아직 생성되지 않았습니다.<br>아래 <b>로드맵 생성 / 갱신</b>을 누르면 모든 구간이 작성됩니다.</div>';
+  body.innerHTML=rm.stages[rm.sel]?mdRich(rm.stages[rm.sel]):
+    '<div class="empty" style="padding:30px 22px;">이 구간은 아직 작성되지 않았습니다.<br><button class="btn btn-seal" style="margin-top:14px;" onclick="genOneStage(\''+rm.sel+'\')">이 구간만 지금 작성하기</button><p class="mini-note" style="margin-top:10px;">아래 <b>로드맵 생성 / 갱신</b>을 누르면 7개 구간이 모두 작성됩니다.</p></div>';
   if(src) src.innerHTML=(rm.at?("생성: "+esc(rm.at)):"")+(rm.stale?' · <b style="color:var(--seal);">프로필/데이터뱅크가 변경되었습니다 — 갱신을 권장합니다</b>':"");
 }
-function rmTab(k){ if(PROFILE.extra&&PROFILE.extra.roadmap){ PROFILE.extra.roadmap.sel=k; showRoadmapV3(); } }
+function rmTab(k){
+  PROFILE.extra=PROFILE.extra||{};
+  PROFILE.extra.roadmap=PROFILE.extra.roadmap||{stages:{},at:"",sel:k};
+  PROFILE.extra.roadmap.sel=k;
+  showRoadmapV3();
+}
+async function genOneStage(k){
+  const st=RM_STAGES.find(function(s){return s.k===k;}); if(!st) return;
+  const body=document.getElementById("roadmap-body");
+  body.innerHTML='<div style="padding:26px 0;text-align:center;color:var(--ink-soft);"><span class="spinner dark"></span> '+esc(st.n)+' 구간을 설계하는 중입니다…</div>';
+  try{
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n"+bankContext()+"\n\n"+RM_PERSONA+"\n\n[이번에 작성할 구간] "+st.n+"\n"+st.inst+"\n\n2000자 이상으로 매우 상세하게. 표와 [그림: 제목] 블록을 활용해 구조를 시각화해라. 이 구간 내용만 출력."}],7500);
+    PROFILE.extra.roadmap=PROFILE.extra.roadmap||{stages:{}};
+    PROFILE.extra.roadmap.stages=PROFILE.extra.roadmap.stages||{};
+    PROFILE.extra.roadmap.stages[k]=raw;
+    PROFILE.extra.roadmap.at=fmtDate(new Date());
+    await saveProfileRemote();
+    showRoadmapV3();
+  }catch(e){ body.innerHTML=claudeErrHtml(e); }
+}
 async function genRoadmap(force){
   const body=document.getElementById("roadmap-body");
   const btn=document.getElementById("roadmap-btn");
   if(!PROFILE.company){ body.innerHTML='<div class="err-box">먼저 사업 프로필을 등록해 주세요.</div>'; return; }
   const nb=bankFilled();
-  if(nb<5&&!confirm("기업 데이터뱅크가 "+nb+"개 항목만 채워져 있습니다.\n지금 생성하면 일반적인 조언에 그칠 수 있습니다.\n\n그래도 진행할까요?")) { go("bank"); return; }
+  if(nb<5&&!await uiConfirm("기업 데이터뱅크가 "+nb+"개 항목만 채워져 있습니다.\n지금 생성하면 일반적인 조언에 그칠 수 있습니다.\n\n그래도 진행할까요?")) { go("bank"); return; }
   btn.disabled=true;
   const ctx=profileContext()+"\n\n"+bankContext();
-  const persona="너는 맥킨지·BCG를 거쳐 한국 중소벤처기업 300여 곳을 매출 100억 이상으로 성장시킨 최고의 성장 전략 컨설턴트다. 위 회사의 전담 컨설턴트로서 답한다.\n\n절대 규칙:\n- 위에 제공된 프로필과 데이터뱅크의 사실만 근거로 판단한다. 없는 정보를 지어내지 않는다.\n- 일반론 금지. 이 회사의 업종·제품·매출·인력·기술을 구체적으로 언급하며 조언한다.\n- 수치와 실제 한국 제도명(벤처확인, 기업부설연구소, 이노비즈, TIPS, 정책자금, 수출바우처 등)을 사용한다.\n- 형식: 마크다운. ## 소제목으로 구분하고 항목은 '- ' 불릿. 표가 필요하면 마크다운 표 사용.";
+  const persona=RM_PERSONA;
+  const _unused="너는 맥킨지·BCG를 거쳐 한국 중소벤처기업 300여 곳을 매출 100억 이상으로 성장시킨 최고의 성장 전략 컨설턴트다. 위 회사의 전담 컨설턴트로서 답한다.\n\n절대 규칙:\n- 위에 제공된 프로필과 데이터뱅크의 사실만 근거로 판단한다. 없는 정보를 지어내지 않는다.\n- 일반론 금지. 이 회사의 업종·제품·매출·인력·기술을 구체적으로 언급하며 조언한다.\n- 수치와 실제 한국 제도명(벤처확인, 기업부설연구소, 이노비즈, TIPS, 정책자금, 수출바우처 등)을 사용한다.\n- 형식: 마크다운. ## 소제목으로 구분하고 항목은 '- ' 불릿. 표가 필요하면 마크다운 표 사용.";
   const stages={};
   PROFILE.extra=PROFILE.extra||{};
   for(let i=0;i<RM_STAGES.length;i++){
@@ -2380,7 +2468,7 @@ async function rmSend(){
   }
 }
 async function rmClear(){
-  if(!confirm("컨설턴트와의 대화를 모두 지울까요?")) return;
+  if(!await uiConfirm("컨설턴트와의 대화를 모두 지울까요?")) return;
   PROFILE.extra.rmChat=[]; await saveProfileRemote(); renderRmChat();
 }
 async function certGuide(name){
@@ -2455,7 +2543,7 @@ async function deepAnalyze(idx){
       if(dj&&dj.ok) doc=dj.text||"";
     }catch(e){}
     btn.innerHTML='<span class="spinner"></span> ② AI가 공고문을 학습·분석 중…';
-    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[분석 대상 공고]\n제목: "+a.title+"\n출처: "+a.source+" · 마감: "+a.deadlineText+"\n요약: "+a.summary+(doc?("\n\n[공고 원문 전문]\n"+doc.slice(0,9500)):"\n\n(원문 페이지 접근 불가 — 제목·요약 기준으로 분석하되 확실하지 않은 항목은 확인필요로 표시)")+"\n\n위 공고를 이 회사 기준으로 정밀 분석해라. 반드시 JSON만 출력:\n{\"score\":0~100 정수(이 회사의 실제 신청 적합도 — 자격 미달이면 30 이하, 업종 무관 40 이하),\"oneline\":\"20자 이내 한줄 판정\",\"explain\":\"공고를 쉬운 말로 4~5문장 풀이\",\"support\":\"지원 내용·금액·기간\",\"target\":\"신청 자격 요지\",\"check\":[{\"item\":\"요건명\",\"ok\":\"충족|미충족|확인필요\",\"why\":\"15자 근거\"} 4~6개 — 원문에 명시된 요건 위주],\"docs\":[\"제출 서류들\"],\"schedule\":\"접수·평가·발표 일정\",\"strategy\":\"이 회사의 작성·준비 전략 3문장\"}"}],1800);
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[분석 대상 공고]\n제목: "+a.title+"\n출처: "+a.source+" · 마감: "+a.deadlineText+"\n요약: "+a.summary+(doc?("\n\n[공고 원문 전문]\n"+doc.slice(0,9500)):"\n\n(원문 페이지 접근 불가 — 제목·요약 기준으로 분석하되 확실하지 않은 항목은 확인필요로 표시)")+"\n\n위 공고를 이 회사 기준으로 정밀 분석해라. 반드시 JSON만 출력:\n{\"score\":0~100 정수(이 회사의 실제 신청 적합도 — 자격 미달이면 30 이하, 업종 무관 40 이하),\"oneline\":\"20자 이내 한줄 판정\",\"explain\":\"공고를 쉬운 말로 4~5문장 풀이\",\"support\":\"지원 내용·금액·기간\",\"target\":\"신청 자격 요지\",\"check\":[{\"item\":\"요건명\",\"ok\":\"충족|미충족|확인필요\",\"why\":\"15자 근거\"} 4~6개 — 원문에 명시된 요건 위주],\"docs\":[\"제출 서류들\"],\"schedule\":\"접수·평가·발표 일정\",\"strategy\":\"이 회사의 작성·준비 전략 3문장\"}"}],5000);
     const pj=parseJson(raw);
     applyDeepScore(a,pj);
     PROFILE.extra=PROFILE.extra||{};
@@ -2558,9 +2646,9 @@ async function renderTeam(){
 }
 async function createOrg(){
   const nm=document.getElementById("org-name").value.trim();
-  if(!nm){ alert("회사 이름을 입력해 주세요."); return; }
+  if(!nm){ uiAlert("회사 이름을 입력해 주세요."); return; }
   const {data,error}=await sb.from("orgs").insert({name:nm,owner_id:userId}).select().maybeSingle();
-  if(error){ alert("생성 실패: "+error.message+"\n\nSupabase에서 팀협업-업데이트3.sql을 실행했는지 확인하세요."); return; }
+  if(error){ uiAlert("생성 실패: "+error.message+"\n\nSupabase에서 팀협업-업데이트3.sql을 실행했는지 확인하세요."); return; }
   await sb.from("org_members").insert({org_id:data.id,user_id:userId,email:userEmail||"",role:"owner",status:"active"});
   await sb.from("profiles").update({org_id:data.id}).eq("id",userId);
   await logAct("org","회사","create","회사를 만들었습니다: "+nm);
@@ -2568,37 +2656,42 @@ async function createOrg(){
 }
 async function inviteMember(){
   const em=document.getElementById("inv-email").value.trim().toLowerCase();
-  if(!em||em.indexOf("@")<0){ alert("올바른 이메일을 입력해 주세요."); return; }
+  if(!em||em.indexOf("@")<0){ uiAlert("올바른 이메일을 입력해 주세요."); return; }
   const {error}=await sb.from("org_members").insert({org_id:ORG.id,email:em,role:"member",status:"invited",invited_by:userEmail||""});
-  if(error){ alert("초대 실패: "+error.message); return; }
+  if(error){ uiAlert("초대 실패: "+error.message); return; }
   await logAct("member","구성원","create",em+" 님을 초대했습니다");
-  alert(em+" 님을 초대했습니다.\n해당 이메일로 회원가입하면 자동으로 팀에 연결됩니다.");
+  const link=location.origin;
+  showModal({title:"초대 등록 완료",icon:"✉",
+    msg:em+" 님을 팀에 등록했습니다.\n\n※ 현재 초대 메일은 자동 발송되지 않습니다. 아래 안내를 직접 전달해 주세요.\n\n──────────\n[공고비서 팀 초대]\n"+ORG.name+" 팀에 초대되었습니다.\n1) "+link+" 접속\n2) "+em+" 이메일로 회원가입\n3) 가입 즉시 팀에 자동 연결됩니다\n──────────",
+    okText:"안내문 복사"}).then(function(){
+      navigator.clipboard.writeText("[공고비서 팀 초대]\n"+ORG.name+" 팀에 초대되었습니다.\n1) "+link+" 접속\n2) "+em+" 이메일로 회원가입\n3) 가입 즉시 팀에 자동 연결됩니다").catch(function(){});
+    });
   renderTeam();
 }
 async function removeMember(id){
-  if(!confirm("이 구성원을 팀에서 제외할까요?")) return;
+  if(!await uiConfirm("이 구성원을 팀에서 제외할까요?")) return;
   await sb.from("org_members").delete().eq("id",id);
   await logAct("member","구성원","delete","구성원을 제외했습니다");
   renderTeam();
 }
 async function pushOrgData(){
   if(!ORG) return;
-  if(!confirm("내 프로필·데이터뱅크·사업계획서를 팀 공유본으로 올릴까요?\n팀의 기존 공유본을 덮어씁니다.")) return;
+  if(!await uiConfirm("내 프로필·데이터뱅크·사업계획서를 팀 공유본으로 올릴까요?\n팀의 기존 공유본을 덮어씁니다.")) return;
   const payload={profile:PROFILE,at:Date.now()};
   const {error}=await sb.from("org_data").upsert({org_id:ORG.id,data:payload,updated_at:new Date().toISOString(),updated_by:userEmail||""});
-  if(error){ alert("공유 실패: "+error.message); return; }
+  if(error){ uiAlert("공유 실패: "+error.message); return; }
   await logAct("orgdata","공유 데이터","update","프로필·데이터뱅크를 팀에 공유했습니다");
-  alert("팀에 공유했습니다."); renderTeam();
+  uiAlert("팀에 공유했습니다."); renderTeam();
 }
 async function pullOrgData(){
   if(!ORG) return;
   const {data}=await sb.from("org_data").select("*").eq("org_id",ORG.id).maybeSingle();
-  if(!data||!data.data||!data.data.profile){ alert("공유된 데이터가 없습니다."); return; }
-  if(!confirm("팀 공유본을 가져오면 내 프로필·데이터뱅크가 팀 최신본으로 바뀝니다.\n계속할까요?")) return;
+  if(!data||!data.data||!data.data.profile){ uiAlert("공유된 데이터가 없습니다."); return; }
+  if(!await uiConfirm("팀 공유본을 가져오면 내 프로필·데이터뱅크가 팀 최신본으로 바뀝니다.\n계속할까요?")) return;
   PROFILE=data.data.profile;
   await saveProfileRemote();
   await logAct("orgdata","공유 데이터","update","팀 데이터를 가져왔습니다");
-  alert("가져왔습니다. 화면을 새로고침합니다."); location.reload();
+  uiAlert("가져왔습니다. 화면을 새로고침합니다."); location.reload();
 }
 /* 항목별 메모 */
 function noteBadge(target){
@@ -2606,7 +2699,7 @@ function noteBadge(target){
   return ORG?('<button style="background:none;border:none;cursor:pointer;font-size:11.5px;color:'+(ns.length?"var(--seal)":"var(--ink-faint)")+';font-weight:700;" onclick="openNotes(\''+target+'\')">💬 '+(ns.length||"메모")+'</button>'):"";
 }
 async function openNotes(target){
-  if(!ORG){ alert("팀을 만들면 메모를 남길 수 있습니다."); return; }
+  if(!ORG){ uiAlert("팀을 만들면 메모를 남길 수 있습니다."); return; }
   await loadNotes();
   const ns=ORG_NOTES[target]||[];
   document.getElementById("guide-title").textContent="메모 · "+target;
@@ -2706,13 +2799,19 @@ async function bankExpand(k){
   const f=BANK_FIELDS.find(function(x){return x.k===k;});
   const el=document.getElementById("bk-"+k), msg=document.getElementById("bkmsg-"+k);
   const cur=el.value.trim();
-  if(cur.length<10){ msg.textContent="먼저 간단히라도 내용을 입력해 주세요"; return; }
-  msg.innerHTML='<span class="spinner dark"></span> 다듬는 중…';
+  if(cur.length<10){ msg.textContent="먼저 핵심 내용을 한두 줄이라도 입력해 주세요"; return; }
+  msg.innerHTML='<span class="spinner dark"></span> 상세하게 작성 중… (30초 정도)';
   try{
-    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[항목] "+f.n+"\n[대표가 입력한 내용]\n"+cur+"\n\n이 내용을 사업계획서에 바로 쓸 수 있게 다듬어라. 규칙: 입력에 없는 사실·수치는 절대 추가하지 말 것(추측 금지). 문장을 명확하게 정리하고 구조화하되, 보강이 필요한 부분은 [보완 필요: 무엇]으로 표시. 300자 내외. 본문만 출력."}],800);
-    el.value=raw.trim(); await bankSave(); msg.textContent="정리됨 ✓";
-    setTimeout(function(){ const m=document.getElementById("bkmsg-"+k); if(m)m.textContent=""; },2500);
-  }catch(e){ msg.textContent="실패했습니다"; }
+    const others=BANK_FIELDS.filter(function(x){return x.k!==k;}).map(function(x){var v=(bank()[x.k]||"").trim(); return v?("["+x.n+"] "+v.slice(0,300)):"";}).filter(Boolean).join("\n");
+    const raw=await callClaude([{role:"user",content:profileContext()+
+      "\n\n[다른 항목에 이미 적힌 내용 — 일관성 유지에 참고]\n"+others.slice(0,4000)+
+      "\n\n[작성할 항목] "+f.n+"\n[작성 예시] "+f.ph+
+      "\n[대표가 입력한 핵심 내용]\n"+cur+
+      "\n\n너는 정부지원사업 사업계획서 전문 컨설턴트다. 위 핵심 내용을 바탕으로 이 항목을 사업계획서·정책자금·투자 IR에 그대로 쓸 수 있는 수준으로 아주 상세하게 작성해라.\n\n규칙:\n1. 입력에 없는 구체적 수치·고객사명·특허번호는 절대 지어내지 말 것. 필요하면 [보완 필요: 무엇]으로 표시\n2. 다만 업계 일반 지식·논리 전개·구조화·표현 보강은 적극적으로 해도 된다\n3. 개조식(ㅇ, -)과 ■ 소제목으로 구조화하고, 비교·일정·구성은 마크다운 표로\n4. 2000자 이상으로 충분히 깊게. 심사위원이 읽고 이해·평가할 수 있을 만큼\n5. 한국어. 본문만 출력"}],7500);
+    el.value=raw.trim(); await bankSave();
+    msg.innerHTML='<b style="color:#1a7f37;">'+raw.trim().length+'자로 작성 완료 ✓</b>';
+    renderBank();
+  }catch(e){ msg.innerHTML='<span style="color:var(--seal);">실패: '+esc((errDetail(e)||"다시 시도해 주세요").slice(0,50))+'</span>'; }
 }
 async function bankSave(){
   const b=bank(); const changed=[];
@@ -2739,7 +2838,7 @@ function renderBankFiles(){
 }
 async function bankUpload(k,input){
   const files=Array.prototype.slice.call(input.files||[]); input.value="";
-  if(!files.length||!sb||!userId){ if(!sb||!userId) alert("파일 첨부는 로그인 후 사용할 수 있습니다."); return; }
+  if(!files.length||!sb||!userId){ if(!sb||!userId) uiAlert("파일 첨부는 로그인 후 사용할 수 있습니다."); return; }
   const bf=bankFiles(); bf[k]=bf[k]||[];
   const fail=[];
   for(let i=0;i<files.length;i++){
@@ -2754,7 +2853,7 @@ async function bankUpload(k,input){
     bf[k].push({name:f.name,path:path});
   }
   await saveProfileRemote(); renderBankFiles();
-  if(fail.length) alert("일부 실패:\n"+fail.join("\n"));
+  if(fail.length) uiAlert("일부 실패:\n"+fail.join("\n"));
 }
 async function bankOpen(k,i){
   const f=(bankFiles()[k]||[])[i]; if(!f||!sb) return;
@@ -2763,50 +2862,50 @@ async function bankOpen(k,i){
 }
 async function bankDelFile(k,i){
   const bf=bankFiles(); const f=(bf[k]||[])[i]; if(!f) return;
-  if(!confirm("첨부를 삭제할까요?")) return;
+  if(!await uiConfirm("첨부를 삭제할까요?")) return;
   if(sb){ try{ await sb.storage.from("apply-docs").remove([f.path]); }catch(e){} }
   bf[k].splice(i,1); await saveProfileRemote(); renderBankFiles();
 }
 async function bankPrefill(){
   const btn=document.getElementById("bank-prefill");
-  if(!PROFILE.company){ alert("먼저 사업 프로필을 등록해 주세요."); return; }
+  if(!PROFILE.company){ uiAlert("먼저 사업 프로필을 등록해 주세요."); return; }
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 프로필·문서에서 추출 중…';
   try{
     const b=bank();
     const empty=BANK_FIELDS.filter(function(f){return !(b[f.k]||"").trim();});
-    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n위 회사 정보와 학습된 문서에서 확인 가능한 사실만으로 아래 항목을 채워라. 절대 지어내지 말 것 — 근거가 없으면 해당 키를 빈 문자열로 둬라. 각 항목 2~4문장.\n항목: "+empty.map(function(f){return f.k+"("+f.n+")";}).join(", ")+"\n반드시 JSON만 출력: {\""+empty.map(function(f){return f.k;}).join("\":\"\",\"")+"\":\"\"}"}],2200);
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n"+bankContext()+"\n\n위 회사 정보와 학습된 문서에서 확인 가능한 사실만으로 아래 항목을 채워라. 절대 지어내지 말 것 — 근거가 없으면 해당 키를 빈 문자열로 둬라. 근거가 있는 항목은 개조식(ㅇ, -)으로 최대한 상세하게(항목당 600자 이상) 작성.\n항목: "+empty.map(function(f){return f.k+"("+f.n+")";}).join(", ")+"\n반드시 JSON만 출력: {\""+empty.map(function(f){return f.k;}).join("\":\"\",\"")+"\":\"\"}"}],7500);
     const pj=parseJson(raw);
     let cnt=0;
     empty.forEach(function(f){ const v=String(pj[f.k]||"").trim(); if(v.length>=20){ b[f.k]=v; cnt++; } });
     await saveProfileRemote(); renderBank();
-    alert(cnt+"개 항목을 채웠습니다. 내용을 확인하고 수정해 주세요.\n(근거가 없는 항목은 비워 두었습니다 — AI가 수치를 지어내지 않도록 설계되어 있습니다.)");
-  }catch(e){ alert("자동 채우기에 실패했습니다. 다시 시도해 주세요."); }
+    uiAlert(cnt+"개 항목을 채웠습니다. 내용을 확인하고 수정해 주세요.\n(근거가 없는 항목은 비워 두었습니다 — AI가 수치를 지어내지 않도록 설계되어 있습니다.)");
+  }catch(e){ uiAlert("자동 채우기에 실패했습니다. 다시 시도해 주세요."); }
   btn.disabled=false; btn.textContent="프로필·학습문서에서 자동 채우기";
 }
 async function bankInterview(){
   const btn=document.getElementById("bank-interview");
   const b=bank();
   const empty=BANK_FIELDS.filter(function(f){return !(b[f.k]||"").trim();});
-  if(!empty.length){ alert("모든 항목이 채워져 있습니다."); return; }
+  if(!empty.length){ uiAlert("모든 항목이 채워져 있습니다."); return; }
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 질문 준비 중…';
   try{
-    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n너는 사업계획서 컨설턴트다. 아래 빈 항목을 채우기 위해 대표에게 물어볼 질문을 만들어라. 대표가 1~2문장으로 바로 답할 수 있는 구체적 질문이어야 한다.\n빈 항목: "+empty.map(function(f){return f.k+"("+f.n+")";}).join(", ")+"\n반드시 JSON만 출력: {\"qs\":[{\"k\":\"항목키\",\"q\":\"질문\"} 최대 5개 — 사업계획서에서 가장 중요한 항목 우선]}"}],900);
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n너는 사업계획서 컨설턴트다. 아래 빈 항목을 채우기 위해 대표에게 물어볼 질문을 만들어라. 대표가 1~2문장으로 바로 답할 수 있는 구체적 질문이어야 한다.\n빈 항목: "+empty.map(function(f){return f.k+"("+f.n+")";}).join(", ")+"\n반드시 JSON만 출력: {\"qs\":[{\"k\":\"항목키\",\"q\":\"질문\"} 최대 5개 — 사업계획서에서 가장 중요한 항목 우선]}"}],6000);
     const qs=(parseJson(raw).qs||[]).slice(0,5);
-    if(!qs.length){ alert("질문 생성에 실패했습니다."); btn.disabled=false; btn.textContent="AI 인터뷰로 빈칸 채우기"; return; }
+    if(!qs.length){ uiAlert("질문 생성에 실패했습니다."); btn.disabled=false; btn.textContent="AI 인터뷰로 빈칸 채우기"; return; }
     const answers=[];
     for(let i=0;i<qs.length;i++){
-      const ans=prompt("["+(i+1)+"/"+qs.length+"] "+qs[i].q+"\n\n(모르면 비워 두고 확인을 누르세요)");
+      const ans=await uiPrompt("["+(i+1)+"/"+qs.length+"] "+qs[i].q+"\n\n(모르면 비워 두고 확인을 누르세요)");
       if(ans===null) break;
       if(ans.trim()) answers.push({k:qs[i].k,q:qs[i].q,a:ans.trim()});
     }
     if(!answers.length){ btn.disabled=false; btn.textContent="AI 인터뷰로 빈칸 채우기"; return; }
     btn.innerHTML='<span class="spinner"></span> 답변을 정리하는 중…';
-    const raw2=await callClaude([{role:"user",content:profileContext()+"\n\n대표의 답변을 사업계획서에 쓸 수 있는 문장으로 다듬어라. 답변에 없는 사실·수치는 절대 추가하지 말 것. 각 2~4문장.\n"+answers.map(function(x){return "["+x.k+"] Q:"+x.q+" A:"+x.a;}).join("\n")+"\n반드시 JSON만 출력: {\""+answers.map(function(x){return x.k;}).join("\":\"\",\"")+"\":\"\"}"}],1600);
+    const raw2=await callClaude([{role:"user",content:profileContext()+"\n\n대표의 답변을 사업계획서에 쓸 수 있는 문장으로 다듬어라. 답변에 없는 사실·수치는 절대 추가하지 말 것. 답변 내용을 개조식으로 구조화하고 논리를 보강해 항목당 600자 이상으로.\n"+answers.map(function(x){return "["+x.k+"] Q:"+x.q+" A:"+x.a;}).join("\n")+"\n반드시 JSON만 출력: {\""+answers.map(function(x){return x.k;}).join("\":\"\",\"")+"\":\"\"}"}],7500);
     const pj2=parseJson(raw2);
     answers.forEach(function(x){ const v=String(pj2[x.k]||"").trim(); if(v) b[x.k]=v; });
     await saveProfileRemote(); renderBank();
-    alert(answers.length+"개 항목이 정리되어 저장되었습니다.");
-  }catch(e){ alert("인터뷰에 실패했습니다. 다시 시도해 주세요."); }
+    uiAlert(answers.length+"개 항목이 정리되어 저장되었습니다.");
+  }catch(e){ uiAlert("인터뷰에 실패했습니다. 다시 시도해 주세요."); }
   btn.disabled=false; btn.textContent="AI 인터뷰로 빈칸 채우기";
 }
 function bankContext(){
@@ -2888,7 +2987,7 @@ async function buildPlan(idx,useForm){
       log('<span class="spinner dark"></span> 양식 파일을 읽는 중…');
       if(formFile.type==="application/pdf"){
         const b64=await new Promise(function(ok,no){const r=new FileReader();r.onload=function(){ok(r.result.split(",")[1]);};r.onerror=no;r.readAsDataURL(formFile);});
-        const ext=await callClaude([{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:"이 사업계획서 양식 문서의 목차 구조를 빠짐없이 그대로 추출해라. 항목 번호·제목·배점·분량 제한이 있으면 함께. 목록만 출력."}]}],1800);
+        const ext=await callClaude([{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:"이 사업계획서 양식 문서의 목차 구조를 빠짐없이 그대로 추출해라. 항목 번호·제목·배점·분량 제한이 있으면 함께. 목록만 출력."}]}],5000);
         formTxt=(formTxt?formTxt+"\n":"")+ext;
       }else{
         try{ formTxt=(formTxt?formTxt+"\n":"")+(await formFile.text()).slice(0,12000); }catch(e){}
@@ -2905,7 +3004,7 @@ async function buildPlan(idx,useForm){
     const raw=await callClaude([{role:"user",content:"[공고]\n"+a.title+"\n요약: "+a.summary+
       (formTxt?("\n\n[제출 양식 목차 — 이것을 최우선으로 그대로 따를 것]\n"+formTxt.slice(0,8000)):"")+
       (doc?("\n\n[공고 원문]\n"+doc.slice(0,8000)):"")+
-      "\n\n사업계획서 작성용 목차를 만들어라. 양식이 주어졌으면 그 항목명·순서·배점을 그대로 사용하고 임의로 바꾸지 마라. 없으면 이 사업 유형의 표준 목차로.\n반드시 JSON만 출력: {\"formName\":\"양식명\",\"sections\":[{\"id\":\"s1\",\"title\":\"항목명(양식 그대로)\",\"guide\":\"이 항목에 들어갈 내용 1문장\",\"points\":배점(없으면0),\"len\":권장분량자수}],\"criteria\":\"평가 배점표 요약\"}"}],2200);
+      "\n\n사업계획서 작성용 목차를 만들어라. 양식이 주어졌으면 그 항목명·순서·배점을 그대로 사용하고 임의로 바꾸지 마라. 없으면 이 사업 유형의 표준 목차로.\n반드시 JSON만 출력: {\"formName\":\"양식명\",\"sections\":[{\"id\":\"s1\",\"title\":\"항목명(양식 그대로)\",\"guide\":\"이 항목에 들어갈 내용 1문장\",\"points\":배점(없으면0),\"len\":권장분량자수}],\"criteria\":\"평가 배점표 요약\"}"}],6000);
     const pj=parseJson(raw);
     const secs=(pj.sections||[]).filter(function(s){return s&&(s.title||s.name);});
     if(!secs.length) throw new Error("EMPTY");
@@ -2922,7 +3021,7 @@ async function buildPlan(idx,useForm){
 }
 
 function openPlan(k){ curPlan=k; renderPlanEditor(); }
-async function delPlan(k){ if(!confirm("이 사업계획서를 삭제할까요?")) return; delete docs()[k]; await saveProfileRemote(); renderWriter(); }
+async function delPlan(k){ if(!await uiConfirm("이 사업계획서를 삭제할까요?")) return; delete docs()[k]; await saveProfileRemote(); renderWriter(); }
 let curSec=0;
 function renderPlanEditor(){
   const p=docs()[curPlan]; if(!p){ curPlan=null; renderWriter(); return; }
@@ -3007,24 +3106,24 @@ async function addRefs(input){
     try{
       let txt="";
       if(f.type==="application/pdf"){
-        if(f.size>3500000){ alert(f.name+": 3.5MB를 넘어 건너뜁니다."); continue; }
+        if(f.size>3500000){ uiAlert(f.name+": 3.5MB를 넘어 건너뜁니다."); continue; }
         const b64=await new Promise(function(ok,no){const r=new FileReader();r.onload=function(){ok(r.result.split(",")[1]);};r.onerror=no;r.readAsDataURL(f);});
-        txt=await callClaude([{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:"이 문서의 핵심 내용을 사업계획서 작성에 참고할 수 있도록 구조적으로 정리해라. 수치·근거·표현을 최대한 보존. 2000자 이내."}]}],2200);
+        txt=await callClaude([{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:"이 문서의 핵심 내용을 사업계획서 작성에 참고할 수 있도록 구조적으로 정리해라. 수치·근거·표현을 최대한 보존. 2000자 이내."}]}],6000);
       }else{ txt=(await f.text()).slice(0,8000); }
       p.refs.push({name:f.name,text:txt});
-    }catch(e){ alert(f.name+" 학습에 실패했습니다."); }
+    }catch(e){ uiAlert(f.name+" 학습에 실패했습니다."); }
   }
   await saveProfileRemote(); renderPlanEditor();
 }
 async function evalSection(){
   const p=docs()[curPlan], s=p.sections[curSec];
   await saveSection();
-  if(!s.text||s.text.length<50){ alert("먼저 내용을 작성해 주세요."); return; }
+  if(!s.text||s.text.length<50){ uiAlert("먼저 내용을 작성해 주세요."); return; }
   const out=document.getElementById("sec-eval");
   out.innerHTML='<div class="panel" style="margin-top:12px;"><span class="spinner dark"></span> 심사위원 관점으로 평가 중…</div>';
   try{
     const raw=await callClaude([{role:"user",content:"너는 정부지원사업 서면평가 심사위원이다. 냉정하게 평가해라. 후하게 주지 마라.\n\n[공고] "+p.title+"\n[평가기준] "+(p.criteria||"표준")+"\n[항목] "+s.title+(s.points?(" (배점 "+s.points+"점)"):"")+"\n[작성 지침] "+(s.guide||"")+"\n\n[제출 내용]\n"+s.text.slice(0,6000)+
-    "\n\n다음 형식으로만 답하라(다른 말 금지):\n점수: 00\n총평: (2문장)\n부족한 점:\n- (구체적으로)\n- \n- \n보완 방법:\n- (무엇을 어떻게 고칠지 구체적으로)\n- \n- "}],2500);
+    "\n\n다음 형식으로만 답하라(다른 말 금지):\n점수: 00\n총평: (2문장)\n부족한 점:\n- (구체적으로)\n- \n- \n보완 방법:\n- (무엇을 어떻게 고칠지 구체적으로)\n- \n- "}],6000);
     const sc=(String(raw).match(/점수\s*[:：]\s*(\d+)/)||[])[1]||"";
     s.eval=raw; s.evalScore=sc?parseInt(sc,10):0;
     await saveProfileRemote();
@@ -3040,9 +3139,9 @@ async function rewriteSection(mode){
   const p=docs()[curPlan], s=p.sections[curSec];
   let fb="";
   if(mode==="manual"){
-    fb=prompt("받으신 피드백이나 수정 요청사항을 입력하세요.\n(심사위원 코멘트, 컨설턴트 의견, 직접 지시 등)","");
+    fb=await uiPrompt("받으신 피드백이나 수정 요청사항을 입력하세요.\n(심사위원 코멘트, 컨설턴트 의견, 직접 지시 등)","");
     if(!fb) return;
-  } else { fb=s.eval||""; if(!fb){ alert("먼저 평가를 실행해 주세요."); return; } }
+  } else { fb=s.eval||""; if(!fb){ uiAlert("먼저 평가를 실행해 주세요."); return; } }
   const out=document.getElementById("sec-eval");
   out.innerHTML='<div class="panel" style="margin-top:12px;"><span class="spinner dark"></span> 피드백을 반영해 다시 작성 중…</div>';
   try{
@@ -3118,7 +3217,7 @@ async function genAllSections(){
   const el=document.getElementById("writer-body");
   const empty=p.sections.map(function(s,i){return i;}).filter(function(i){return !p.sections[i].text;});
   let list=empty;
-  if(!empty.length){ if(!confirm("모든 항목이 작성되어 있습니다. 전부 다시 작성할까요?")) return; list=p.sections.map(function(s,i){return i;}); }
+  if(!empty.length){ if(!await uiConfirm("모든 항목이 작성되어 있습니다. 전부 다시 작성할까요?")) return; list=p.sections.map(function(s,i){return i;}); }
   el.innerHTML='<div class="panel"><h3>전 항목 작성 중</h3><p class="mini-note">항목마다 즉시 저장되므로 중간에 실패해도 앞선 결과는 남습니다. 실패한 항목은 개별로 다시 작성할 수 있습니다.</p><div id="ga-log" style="font-size:13px;color:var(--ink-soft);line-height:2.1;margin-top:12px;"></div><div id="ga-done" style="margin-top:14px;"></div></div>';
   const log=function(t){ const e=document.getElementById("ga-log"); if(e) e.innerHTML+=t+"<br>"; };
   let ok=0, fail=[];
@@ -3140,19 +3239,19 @@ async function tuneSection(i,mode){
   try{
     const inst = mode==="expand" ? "아래 내용을 유지하면서 근거와 설명을 보강해 1.5배 분량으로 늘려라. 새로운 수치를 지어내지 말고, 필요하면 [입력 필요: 항목]으로 표시."
       : "아래 내용의 핵심만 남기고 군더더기를 덜어 30% 짧게 다듬어라. 수치와 근거는 반드시 유지.";
-    const raw=await callClaude([{role:"user",content:inst+"\n\n"+s.text}],2000);
+    const raw=await callClaude([{role:"user",content:inst+"\n\n"+s.text}],6000);
     s.text=raw.trim(); await saveProfileRemote(); renderPlanEditor();
   }catch(e){ if(m) m.textContent="실패했습니다"; }
 }
 async function reviewPlan(){
   const p=docs()[curPlan];
   const filled=p.sections.filter(function(s){return s.text;});
-  if(!filled.length){ alert("먼저 섹션을 작성해 주세요."); return; }
+  if(!filled.length){ uiAlert("먼저 섹션을 작성해 주세요."); return; }
   const out=document.getElementById("review-out");
   out.innerHTML='<div class="panel"><span class="spinner dark"></span> 심사위원 관점으로 검수 중…</div>';
   try{
     const body=p.sections.map(function(s){return "["+s.title+(s.points?("/"+s.points+"점"):"")+"]\n"+(s.text||"(미작성)");}).join("\n\n").slice(0,12000);
-    const raw=await callClaude([{role:"user",content:"너는 이 공고의 서면평가 심사위원이다.\n[공고] "+p.title+"\n[평가 기준] "+(p.criteria||"표준 심사")+"\n\n[제출된 사업계획서]\n"+body+"\n\n실제 심사하듯 냉정하게 평가해라. 반드시 JSON만 출력:\n{\"score\":0~100,\"summary\":\"총평 2문장\",\"items\":[{\"sec\":\"섹션명\",\"score\":점수,\"good\":\"잘된 점\",\"fix\":\"반드시 고칠 점(구체적으로)\"} 각 섹션],\"priority\":[\"점수를 가장 크게 올릴 수정 3가지\"],\"risk\":\"탈락 위험 요소 1~2가지\"}"}],2200);
+    const raw=await callClaude([{role:"user",content:"너는 이 공고의 서면평가 심사위원이다.\n[공고] "+p.title+"\n[평가 기준] "+(p.criteria||"표준 심사")+"\n\n[제출된 사업계획서]\n"+body+"\n\n실제 심사하듯 냉정하게 평가해라. 반드시 JSON만 출력:\n{\"score\":0~100,\"summary\":\"총평 2문장\",\"items\":[{\"sec\":\"섹션명\",\"score\":점수,\"good\":\"잘된 점\",\"fix\":\"반드시 고칠 점(구체적으로)\"} 각 섹션],\"priority\":[\"점수를 가장 크게 올릴 수정 3가지\"],\"risk\":\"탈락 위험 요소 1~2가지\"}"}],6000);
     const j=parseJson(raw);
     p.score=Math.max(0,Math.min(100,Math.round(Number(j.score)||0)));
     const html='<div class="panel"><h3>심사 검수 결과 · '+p.score+'점</h3>'+
@@ -3176,7 +3275,7 @@ async function autoImprove(){
   for(let i=0;i<p.sections.length;i++){
     const s=p.sections[i]; if(!s.text) continue;
     try{
-      const raw=await callClaude([{role:"user",content:bankContext()+"\n\n[심사 피드백]\n"+plain+"\n\n[보완할 섹션] "+s.title+"\n"+s.text+"\n\n피드백을 반영해 이 섹션을 다시 작성해라. 데이터뱅크에 없는 수치는 지어내지 말고 [입력 필요: 항목]으로 표시. 분량 "+s.len+"자 내외. 본문만 출력."}],2200);
+      const raw=await callClaude([{role:"user",content:bankContext()+"\n\n[심사 피드백]\n"+plain+"\n\n[보완할 섹션] "+s.title+"\n"+s.text+"\n\n피드백을 반영해 이 섹션을 다시 작성해라. 데이터뱅크에 없는 수치는 지어내지 말고 [입력 필요: 항목]으로 표시. 분량 "+s.len+"자 내외. 본문만 출력."}],6000);
       s.text=raw.replace(/^#+ /gm,"■ ").trim();
       await saveProfileRemote();
     }catch(e){}
@@ -3186,8 +3285,8 @@ async function autoImprove(){
 async function savePlanToApply(){
   const p=docs()[curPlan];
   const idx=ANNS.findIndex(function(x){return x.key===p.annKey;});
-  if(idx<0){ alert("연결된 공고를 찾을 수 없습니다."); return; }
-  if(!sb||!userId){ alert("지원 현황 연동은 로그인 후 사용할 수 있습니다."); return; }
+  if(idx<0){ uiAlert("연결된 공고를 찾을 수 없습니다."); return; }
+  if(!sb||!userId){ uiAlert("지원 현황 연동은 로그인 후 사용할 수 있습니다."); return; }
   const a=ANNS[idx];
   if(scraps[a.key]===undefined) await toggleScrap(idx);
   const sc=scrapOf(a.key);
@@ -3200,12 +3299,12 @@ async function savePlanToApply(){
   const fname=(PROFILE.company||"사업계획서")+"_"+p.formName.replace(/[^\w가-힣]/g,"")+"_"+fmtDate(new Date()).replace(/[^0-9]/g,"")+".doc";
   const path=userId+"/"+String(a.key).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,40)+"/subs_"+Date.now()+"_plan.doc";
   const {error}=await sb.storage.from("apply-docs").upload(path,blob);
-  if(error){ alert("저장 실패: "+error.message); return; }
+  if(error){ uiAlert("저장 실패: "+error.message); return; }
   sc.detail.subs=sc.detail.subs||[];
   sc.detail.subs.push({name:fname,path:path});
   applyKey=a.key; applyIdx=idx;
   await saveApply(false);
-  if(confirm("지원 현황의 '① 신청·서면평가 제출 서류'에 저장했습니다.\n\n지원 관리 페이지로 이동할까요?")) openApply(idx);
+  if(await uiConfirm("지원 현황의 '① 신청·서면평가 제출 서류'에 저장했습니다.\n\n지원 관리 페이지로 이동할까요?")) openApply(idx);
 }
 function docHtml(t){
   const lines=esc(t).split(/\n/); let out="",tbl=[];
@@ -3243,7 +3342,7 @@ function exportPlan(){
   let msg="사업계획서를 내려받았습니다. Word·한글에서 열어 공고 양식에 맞춰 다듬으세요.";
   if(needs) msg+="\n\n⚠ [입력 필요] 표시가 "+needs+"곳 남아 있습니다. 제출 전 실제 수치로 채워주세요.";
   msg+="\n\n완성본은 '지원 현황 → 해당 공고 → ① 신청 제출 서류'에 올려두면 함께 관리됩니다.";
-  alert(msg);
+  uiAlert(msg);
 }
 
 /* ══ 드로어 공통 ══ */
