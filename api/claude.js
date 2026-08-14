@@ -20,7 +20,7 @@ module.exports = async (req, res) => {
     const reqModel = req.body && req.body.model;
     const model = MODELS[reqModel] ? reqModel : (process.env.OPENAI_MODEL || "gpt-5.6-terra");
     const provider = MODELS[model] || "openai";
-    const maxTok = Math.min(max_tokens, 4000);
+    const maxTok = Math.min(max_tokens, 8000);
 
     /* ── Anthropic (Claude): 프론트가 이미 Anthropic 형식이라 그대로 전달 ── */
     if (provider === "anthropic") {
