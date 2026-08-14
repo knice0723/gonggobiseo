@@ -1693,6 +1693,45 @@ document.addEventListener("keydown",function(e){
   if(e.key==="Enter"){ e.preventDefault(); modalOk(); }
   if(e.key==="Escape"){ modalCancel(); }
 });
+let _pdfjs=null;
+async function loadPdfJs(){
+  if(_pdfjs) return _pdfjs;
+  if(window.pdfjsLib){ _pdfjs=window.pdfjsLib; return _pdfjs; }
+  await new Promise(function(ok,no){
+    const s=document.createElement("script");
+    s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload=ok; s.onerror=function(){ no(new Error("PDF 처리기 로드 실패")); };
+    document.head.appendChild(s);
+  });
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  _pdfjs=window.pdfjsLib;
+  return _pdfjs;
+}
+// PDF에서 텍스트만 추출 (파일 크기 제한 없음). onProgress(현재쪽, 전체쪽)
+async function pdfToText(file, onProgress){
+  const lib=await loadPdfJs();
+  const buf=await file.arrayBuffer();
+  const doc=await lib.getDocument({data:buf}).promise;
+  const n=doc.numPages;
+  let out=[];
+  for(let i=1;i<=n;i++){
+    if(onProgress) onProgress(i,n);
+    const page=await doc.getPage(i);
+    const tc=await page.getTextContent();
+    let last=null, line="";
+    const lines=[];
+    tc.items.forEach(function(it){
+      const y=it.transform[5];
+      if(last!==null&&Math.abs(y-last)>3){ if(line.trim())lines.push(line.trim()); line=""; }
+      line+=it.str+(it.hasEOL?"":" ");
+      last=y;
+    });
+    if(line.trim())lines.push(line.trim());
+    out.push(lines.join("\n"));
+    if(out.join("").length>200000) break;
+  }
+  return out.join("\n\n").replace(/[ \t]+/g," ").replace(/\n{3,}/g,"\n\n").trim();
+}
 function parseJson(raw){
   let t=String(raw||"").replace(/```json|```/g,"").trim();
   const i=t.indexOf("{"), j=t.lastIndexOf("}");
@@ -1872,13 +1911,24 @@ async function analyzeOne(source, prevLearned){
   const prompt='너는 정부지원사업 매칭 서비스의 분석 엔진이다. 아래 사업 문서를 읽고 반드시 JSON만 출력해라. 마크다운 코드펜스, 설명 문장 금지.\n스키마: {"summary":"3~4문장 사업 요약","strengths":["강점 4~6개"],"keywords":["#형태의 매칭 키워드 4~8개"],"fields":["추천 지원 분야 2~3개"],"improve":["사업계획서 보완 포인트 2~4개"]}'
     +(prevLearned?('\n\n[기존 학습 내용 — 이전 문서들의 종합]\n'+JSON.stringify(prevLearned)+'\n\n기존 학습 내용에 새 문서의 정보를 통합해 "갱신된 종합본" JSON을 출력해라. 여전히 유효한 기존 정보는 유지하고, 새 정보를 추가·보강해라.'):'');
   let content;
-  if(source.file&&source.file.type==="application/pdf"){
-    const b64=await new Promise(function(ok,no){const r=new FileReader();r.onload=function(){ok(r.result.split(",")[1]);};r.onerror=function(){no(new Error("read"));};r.readAsDataURL(source.file);});
-    content=[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:prompt}];
+  if(source.file&&/pdf$/i.test(source.file.type||source.file.name||"")){
+    let txt="";
+    try{
+      const btn=document.getElementById("analyze-btn");
+      txt=await pdfToText(source.file,function(p,n){ if(btn) btn.innerHTML='<span class="spinner"></span> PDF 읽는 중… '+p+'/'+n+'쪽'; });
+    }catch(e){ txt=""; }
+    if(txt.length>=150){
+      content=prompt+"\n\n[문서 내용 — "+source.file.name+"]\n"+txt.slice(0,60000);
+    }else if(source.file.size<=3500000){ // 스캔 PDF는 이미지 인식 경로로
+      const b64=await new Promise(function(ok,no){const r=new FileReader();r.onload=function(){ok(r.result.split(",")[1]);};r.onerror=function(){no(new Error("read"));};r.readAsDataURL(source.file);});
+      content=[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:prompt}];
+    }else{
+      throw new Error("SERVER::글자를 추출할 수 없는 PDF(스캔본)이고 용량이 3.5MB를 넘습니다. 압축하거나 내용을 붙여넣어 주세요.");
+    }
   }else{
     let txt=source.text||"";
     if(source.file) txt=await source.file.text();
-    content=prompt+"\n\n[문서 내용]\n"+txt.slice(0,20000);
+    content=prompt+"\n\n[문서 내용]\n"+txt.slice(0,60000);
   }
   const raw=await callClaude([{role:"user",content:content}],3000);
   const cleaned=raw.replace(/```json|```/g,"").trim();
@@ -1891,7 +1941,7 @@ async function analyzeDoc(){
   const paste=document.getElementById("doc-paste").value.trim();
   const jobs=[];
   uploadedFiles.forEach(function(f){
-    if(f.type==="application/pdf"&&f.size>3500000){ jobs.push({skip:true,name:f.name,reason:(f.size/1048576).toFixed(1)+"MB — 3.5MB 초과로 건너뜀 (압축 후 재시도)"}); }
+    if(f.size>30*1024*1024){ jobs.push({skip:true,name:f.name,reason:(f.size/1048576).toFixed(1)+"MB — 30MB 초과"}); }
     else jobs.push({file:f,name:f.name});
   });
   if(paste) jobs.push({text:paste,name:"붙여넣은 텍스트"});
@@ -1928,7 +1978,7 @@ async function analyzeDoc(){
     await saveProfileRemote(); rescoreAll(); renderLearnedDoc(); setTimeout(aiRerank,600);
     uploadedFiles=[]; document.getElementById("doc-file").value="";
     document.getElementById("doc-paste").value="";
-    document.getElementById("dropzone").innerHTML='<b>파일 올리기 (PDF, TXT)</b>추가로 학습시킬 문서를 선택하세요 (여러 개 선택 가능)';
+    document.getElementById("dropzone").innerHTML='<b>파일 올리기 (PDF, TXT)</b>여러 개 선택 가능 · 큰 파일도 괜찮습니다 (최대 30MB)';
     out.innerHTML='<div class="ai-result"><span class="ai-badge">'+done.length+'개 문서 학습 완료 — 종합 학습 내용이 갱신되었습니다</span>'+
       (skipped.length?'<p style="color:var(--warn);font-size:12.5px;margin-top:8px;">건너뜀: '+skipped.map(esc).join(", ")+'</p>':"")+
       '<p class="mini-note" style="margin-top:8px;">위 "학습된 문서" 카드에서 파일 목록과 종합 내용을 확인할 수 있습니다.</p></div>';
@@ -3427,9 +3477,16 @@ async function buildPlan(idx,useForm){
     let formTxt=(document.getElementById("form-paste").value||"").trim();
     if(useForm&&formFile){
       log('<span class="spinner dark"></span> 양식 파일을 읽는 중…');
-      if(formFile.type==="application/pdf"){
-        const b64=await new Promise(function(ok,no){const r=new FileReader();r.onload=function(){ok(r.result.split(",")[1]);};r.onerror=no;r.readAsDataURL(formFile);});
-        const ext=await callClaude([{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:"이 사업계획서 양식 문서의 목차 구조를 빠짐없이 그대로 추출해라. 항목 번호·제목·배점·분량 제한이 있으면 함께. 목록만 출력."}]}],5000);
+      if(/pdf$/i.test(formFile.type||formFile.name||"")){
+        let rawTxt="";
+        try{ rawTxt=await pdfToText(formFile,function(pg,n){ log("&nbsp;&nbsp;→ 양식 PDF "+pg+"/"+n+"쪽 읽는 중"); }); }catch(e){}
+        let ext="";
+        if(rawTxt.length>=150){
+          ext=await callClaude([{role:"user",content:"다음은 사업계획서 양식 문서 원문이다. 목차 구조를 빠짐없이 그대로 추출해라. 항목 번호·제목·배점·분량 제한이 있으면 함께. 목록만 출력.\n\n"+rawTxt.slice(0,40000)}],5000);
+        } else if(formFile.size<=3500000){
+          const b64=await new Promise(function(ok,no){const r=new FileReader();r.onload=function(){ok(r.result.split(",")[1]);};r.onerror=no;r.readAsDataURL(formFile);});
+          ext=await callClaude([{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:"이 사업계획서 양식의 목차 구조를 빠짐없이 추출해라. 목록만 출력."}]}],5000);
+        } else { log("&nbsp;&nbsp;→ 양식 PDF에서 글자를 추출하지 못했습니다(스캔본). 목차를 붙여넣어 주세요."); }
         formTxt=(formTxt?formTxt+"\n":"")+ext;
       }else{
         try{ formTxt=(formTxt?formTxt+"\n":"")+(await formFile.text()).slice(0,12000); }catch(e){}
@@ -3558,11 +3615,17 @@ async function addRefs(input){
     if(msg) msg.innerHTML='<span class="spinner dark"></span> '+esc(f.name)+' 학습 중…';
     try{
       let txt="";
-      if(f.type==="application/pdf"){
-        if(f.size>3500000){ uiAlert(f.name+": 3.5MB를 넘어 건너뜁니다."); continue; }
-        const b64=await new Promise(function(ok,no){const r=new FileReader();r.onload=function(){ok(r.result.split(",")[1]);};r.onerror=no;r.readAsDataURL(f);});
-        txt=await callClaude([{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:"이 문서의 핵심 내용을 사업계획서 작성에 참고할 수 있도록 구조적으로 정리해라. 수치·근거·표현을 최대한 보존. 2000자 이내."}]}],6000);
-      }else{ txt=(await f.text()).slice(0,8000); }
+      if(/pdf$/i.test(f.type||f.name||"")){
+        let raw="";
+        try{ raw=await pdfToText(f,function(pg,n){ if(msg) msg.innerHTML='<span class="spinner dark"></span> '+esc(f.name)+' 읽는 중… '+pg+'/'+n+'쪽'; }); }catch(e){}
+        if(raw.length>=150){
+          if(msg) msg.innerHTML='<span class="spinner dark"></span> '+esc(f.name)+' 요약 중…';
+          txt=await callClaude([{role:"user",content:"다음 문서의 핵심 내용을 사업계획서 작성에 참고할 수 있도록 구조적으로 정리해라. 수치·근거·표현을 최대한 보존. 3000자 이내.\n\n"+raw.slice(0,50000)}],6000);
+        } else if(f.size<=3500000){
+          const b64=await new Promise(function(ok,no){const r=new FileReader();r.onload=function(){ok(r.result.split(",")[1]);};r.onerror=no;r.readAsDataURL(f);});
+          txt=await callClaude([{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:"이 문서의 핵심 내용을 구조적으로 정리해라. 3000자 이내."}]}],6000);
+        } else { uiAlert(f.name+": 글자 추출이 안 되는 스캔 PDF이고 3.5MB를 초과합니다."); continue; }
+      }else{ txt=(await f.text()).slice(0,20000); }
       p.refs.push({name:f.name,text:txt});
     }catch(e){ uiAlert(f.name+" 학습에 실패했습니다."); }
   }
