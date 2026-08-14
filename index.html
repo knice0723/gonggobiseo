@@ -790,7 +790,8 @@ function mdRich(t){
       li--; out+=mdTable(tb); continue;
     }
     if(/^#{2,3}\s+/.test(l)){ if(inUl){out+="</ul>";inUl=false;} out+='<div class="sec-title" style="margin:20px 0 10px;">'+l.replace(/^#{2,3}\s+/,"")+'</div>'; }
-    else if(/^[-•*]\s+/.test(l)){ if(!inUl){out+='<ul style="padding-left:18px;display:flex;flex-direction:column;gap:7px;margin:4px 0 8px;">';inUl=true;} out+='<li>'+l.replace(/^[-•*]\s+/,"")+'</li>'; }
+    else if(/^[-•*ㅇ○◦]\s+/.test(l)){ if(!inUl){out+='<ul style="padding-left:18px;display:flex;flex-direction:column;gap:7px;margin:4px 0 8px;">';inUl=true;} out+='<li>'+l.replace(/^[-•*ㅇ○◦]\s+/,"")+'</li>'; }
+    else if(/^\s{1,6}[-•*ㅇ○◦]\s+/.test(raw)){ if(!inUl){out+='<ul style="padding-left:18px;display:flex;flex-direction:column;gap:7px;margin:4px 0 8px;">';inUl=true;} out+='<li style="margin-left:14px;color:var(--ink-faint);">'+l.replace(/^[-•*ㅇ○◦]\s+/,"")+'</li>'; }
     else if(l===""){ if(inUl){out+="</ul>";inUl=false;} }
     else { if(inUl){out+="</ul>";inUl=false;} out+='<p style="margin:6px 0;">'+l+'</p>'; }
   }
@@ -2195,23 +2196,31 @@ async function discoverCerts(){
   const btn=document.getElementById("cert-discover-btn");
   if(!PROFILE.company){ alert("먼저 사업 프로필을 등록해 주세요."); return; }
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 숨은 제도 발굴 중…';
+  let raw="";
   try{
-    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n"+bankContext()+"\n\n위 회사가 활용할 수 있는데 대표들이 잘 모르는 정부 제도·인증·세제혜택·바우처·특례를 10개 찾아라. 업종·업력·규모에 실제 해당하는 것만. 벤처확인·기업부설연구소·이노비즈·메인비즈·기보·GS인증·ISO·TIPS·수출바우처는 제외.\n\n출력 형식(다른 말 없이 이 형식으로만, 한 줄에 하나):\n제도명 | 이 회사에 유용한 이유 20자\n제도명 | 이유"}],1200);
-    const items=String(raw||"").split(/\n/).map(function(l){
-      const t=l.replace(/^[\s\-*\d.)]+/,"").trim();
-      if(!t||t.indexOf("|")<0) return null;
-      const p=t.split("|");
-      const nm=p[0].trim().replace(/^\*+|\*+$/g,"");
-      if(!nm||nm.length>40) return null;
-      return {name:nm,why:(p[1]||"").trim().slice(0,40)};
-    }).filter(Boolean).slice(0,12);
-    if(!items.length) throw new Error("EMPTY");
-    PROFILE.extra=PROFILE.extra||{}; PROFILE.extra.customCerts=items;
+    raw=await callClaude([{role:"user",content:profileContext()+"\n\n이 회사가 활용할 수 있는 한국의 정부 지원제도·인증·세제혜택·바우처를 10가지 알려줘. 대표들이 잘 모르는 것 위주로. 각 줄은 '제도명: 설명' 형태로 한 줄씩만 써줘. 번호나 다른 설명은 붙이지 마."}],1000);
+    const items=[];
+    String(raw||"").split(/\n+/).forEach(function(l){
+      let t=l.replace(/^[\s\-*•]+/,"").replace(/^\d+[.)]\s*/,"").trim();
+      if(!t||t.length<3) return;
+      let nm="", why="";
+      const sep=t.search(/[:：|—-]\s/);
+      if(sep>0){ nm=t.slice(0,sep).trim(); why=t.slice(sep+1).replace(/^[\s:：|—-]+/,"").trim(); }
+      else { nm=t.slice(0,30).trim(); }
+      nm=nm.replace(/^\*+|\*+$/g,"").replace(/^\[|\]$/g,"").trim();
+      if(!nm||nm.length>45||/^(다음|아래|이|그|위)/.test(nm)) return;
+      items.push({name:nm,why:why.slice(0,45)});
+    });
+    const uniq=[]; const seen={};
+    items.forEach(function(x){ if(!seen[x.name]){ seen[x.name]=1; uniq.push(x); } });
+    if(!uniq.length) throw new Error("NOITEM");
+    PROFILE.extra=PROFILE.extra||{}; PROFILE.extra.customCerts=uniq.slice(0,12);
     await saveProfileRemote(); renderCertChips();
     btn.textContent="🔎 다시 발굴";
   }catch(e){
     const d=errDetail(e);
-    alert("발굴에 실패했습니다."+(d?("\n\n원인: "+d.slice(0,200)):"\n\nAI 응답을 이해하지 못했습니다. 잠시 후 다시 시도해 주세요."));
+    if(d) alert("발굴 실패 — AI 서버 오류\n\n"+d.slice(0,200));
+    else alert("발굴에 실패했습니다.\n\nAI가 보낸 응답:\n"+String(raw||"(응답 없음)").slice(0,300)+"\n\n알림 설정에서 다른 AI 모델로 바꿔 시도해 보세요.");
     btn.textContent="🔎 우리 회사 맞춤 숨은 제도 AI 발굴";
   }
   btn.disabled=false;
@@ -2681,7 +2690,7 @@ async function buildPlan(idx,useForm){
     const key="pl"+Date.now();
     docs()[key]={key:key,annKey:a.key,idx:idx,title:a.title,formName:pj.formName||"사업계획서",criteria:pj.criteria||"",
       formSrc:formTxt?"업로드한 양식 기준":(doc?"공고 원문 기준":"표준 목차"),
-      sections:secs.map(function(s,i){return {id:s.id||("s"+i),title:s.title||s.name,guide:s.guide||"",points:s.points||0,len:s.len||700,text:""};}),
+      sections:secs.map(function(s,i){return {id:s.id||("s"+i),title:s.title||s.name,guide:s.guide||"",points:s.points||0,len:Math.max(400,Math.min(1800,s.len||900)),text:""};}),
       at:Date.now(),atStr:fmtDate(new Date()),score:0};
     await saveProfileRemote();
     log("&nbsp;&nbsp;→ "+secs.length+"개 항목 구성 완료 ✓");
@@ -2726,10 +2735,11 @@ function renderPlanEditor(){
             (s.text?'<button class="btn" onclick="tuneSection('+curSec+',\'expand\')">더 길게</button><button class="btn" onclick="tuneSection('+curSec+',\'trim\')">간결하게</button>':'')+
           '</div>'+
           (s.guide?'<p class="mini-note" style="margin:0 0 10px;">작성 지침: '+esc(s.guide)+(s.points?(' · 배점 '+s.points+'점'):'')+'</p>':'')+
-          '<div style="display:flex;gap:6px;margin-bottom:8px;"><button class="btn" style="font-size:11.5px;" onclick="togglePreview()">👁 미리보기(표 확인)</button>'+
-          '<button class="btn" style="font-size:11.5px;" onclick="evalSection()">⚖ 이 항목 평가해보기</button></div>'+
-          '<div id="sec-preview" class="hidden" style="border:1px solid var(--line);border-radius:10px;padding:18px 20px;background:var(--card);font-size:13.5px;line-height:1.9;min-height:220px;"></div>'+
-          '<textarea class="wr-editor" id="sec-text" oninput="secDirty=true" onchange="saveSection()" placeholder="아직 작성되지 않았습니다. 위 버튼을 눌러 AI가 초안을 작성하게 하거나, 직접 입력하세요.">'+esc(s.text||"")+'</textarea>'+
+          '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;"><button class="btn" id="pv-btn" style="font-size:11.5px;" onclick="togglePreview()">✏ 직접 편집하기</button>'+
+          '<button class="btn" style="font-size:11.5px;" onclick="evalSection()">⚖ 이 항목 평가해보기</button>'+
+          '<button class="btn" style="font-size:11.5px;" onclick="copySection()">📋 본문 복사</button></div>'+
+          '<div id="sec-preview" style="border:1px solid var(--line);border-radius:10px;padding:20px 22px;background:var(--card);font-size:13.5px;line-height:1.9;min-height:300px;"></div>'+
+          '<textarea class="hidden wr-editor" id="sec-text" oninput="secDirty=true" onchange="saveSection()">'+esc(s.text||"")+'</textarea>'+
           '<div style="display:flex;gap:10px;align-items:center;margin-top:8px;">'+
             '<button class="btn" onclick="saveSection(true)">저장</button>'+
             '<span id="sec-msg" style="font-size:12px;color:var(--ink-soft);"></span>'+
@@ -2741,13 +2751,27 @@ function renderPlanEditor(){
         '<div id="review-out"></div>'+
       '</div>'+
     '</div>';
+  renderSecPreview();
   if(p.review) document.getElementById("review-out").innerHTML=p.review;
 }
 let secDirty=false;
-function togglePreview(){
+function renderSecPreview(){
   const t=document.getElementById("sec-text"), p=document.getElementById("sec-preview");
-  if(p.classList.contains("hidden")){ p.innerHTML=mdRich(t.value.replace(/^■ /gm,"## ")); p.classList.remove("hidden"); t.classList.add("hidden"); }
-  else { p.classList.add("hidden"); t.classList.remove("hidden"); }
+  if(!t||!p) return;
+  const v=t.value;
+  p.innerHTML = v.trim() ? mdRich(v.replace(/^■ /gm,"## ")).replace(/\[입력 필요[^\]]*\]/g,function(m){return '<span class="need-tag">'+m+'</span>';}).replace(/\[도표[^\]]*\]/g,function(m){return '<span style="display:inline-block;border:1px dashed var(--line);border-radius:6px;padding:4px 10px;color:var(--ink-faint);font-size:12px;margin:4px 0;">'+m+'</span>';})
+    : '<span style="color:var(--ink-faint);">아직 작성되지 않았습니다. 위의 <b>이 섹션 작성</b> 버튼을 누르거나, <b>직접 편집하기</b>로 입력하세요.</span>';
+}
+function togglePreview(){
+  const t=document.getElementById("sec-text"), p=document.getElementById("sec-preview"), b=document.getElementById("pv-btn");
+  if(t.classList.contains("hidden")){ t.classList.remove("hidden"); p.classList.add("hidden"); b.textContent="👁 미리보기(표 확인)"; t.focus(); }
+  else { saveSection(); renderSecPreview(); t.classList.add("hidden"); p.classList.remove("hidden"); b.textContent="✏ 직접 편집하기"; }
+}
+function copySection(){
+  const t=document.getElementById("sec-text");
+  navigator.clipboard.writeText(t.value).then(function(){
+    const m=document.getElementById("sec-msg"); if(m){ m.textContent="복사됨 ✓ (한글·워드에 붙여넣기)"; setTimeout(function(){m.textContent="";},2500); }
+  });
 }
 async function addRefs(input){
   const files=Array.prototype.slice.call(input.files||[]); input.value="";
@@ -2821,23 +2845,25 @@ async function saveSection(showMsg){
   const m=document.getElementById("sec-msg");
   if(m&&showMsg){ m.textContent="저장됨 ✓"; setTimeout(function(){m.textContent="";},2000); }
 }
-function planPrompt(p,s){
+function planPrompt(p,s,shorter){
   var refTxt="";
   if(p.refs&&p.refs.length){
     refTxt="\n\n[참고자료 — 대표가 올린 자료. 문체·구성·근거로 활용]\n"+p.refs.map(function(r){return "["+r.name+"]\n"+String(r.text||"").slice(0,3000);}).join("\n\n");
   }
   return bankContext()+"\n\n"+profileContext()+"\n\n[지원 공고]\n"+p.title+"\n[제출 양식] "+p.formName+"\n[평가 기준] "+(p.criteria||"표준 심사")+refTxt+
     "\n\n[작성할 항목] "+s.title+(s.points?(" (배점 "+s.points+"점)"):"")+"\n지침: "+(s.guide||"이 항목의 표준 내용")+
-    "\n\n작성 규칙(반드시 지킬 것):\n1. 회사 수치·실적·인력·특허는 데이터뱅크에 있는 것만 사용. 없는 수치는 절대 지어내지 말고 [입력 필요: 항목명]으로 표시\n2. 반드시 개조식으로 — 대부분의 문장을 'ㅇ ' 또는 '- '로 시작하는 항목으로, 서술형 문단은 최소화\n3. ■ 소제목으로 단락을 나누고 각 소제목 아래 개조식 항목 3~6개\n4. 표를 적극 활용 — 비교·일정·예산·목표 지표·경쟁사 분석은 반드시 마크다운 표로 (| 구분 | 내용 | 형식)\n5. 도표가 필요한 위치는 [도표: 무엇을 그릴지] 형태로 명시\n6. 심사위원이 배점을 줄 수 있게 정량 근거 중심\n7. 분량 "+s.len+"자 내외, 한국어. 마크다운 헤더(#) 금지\n\n본문만 출력해라.";
+    "\n\n작성 규칙(반드시 지킬 것):\n1. 회사 수치·실적·인력·특허는 데이터뱅크에 있는 것만 사용. 없는 수치는 절대 지어내지 말고 [입력 필요: 항목명]으로 표시\n2. 반드시 개조식으로 — 대부분의 문장을 'ㅇ ' 또는 '- '로 시작하는 항목으로, 서술형 문단은 최소화\n3. ■ 소제목으로 단락을 나누고 각 소제목 아래 개조식 항목 3~6개\n4. 표를 적극 활용 — 비교·일정·예산·목표 지표·경쟁사 분석은 반드시 마크다운 표로 (| 구분 | 내용 | 형식)\n5. 도표가 필요한 위치는 [도표: 무엇을 그릴지] 형태로 명시\n6. 심사위원이 배점을 줄 수 있게 정량 근거 중심\n7. 분량 "+(shorter?Math.min(700,s.len):s.len)+"자 내외, 한국어. 마크다운 헤더(#) 금지\n\n본문만 출력해라.";
 }
 async function genSection(i,silent){
   const p=docs()[curPlan]; const s=p.sections[i];
   const msgEl=document.getElementById("sec-msg");
-  if(!silent&&msgEl) msgEl.innerHTML='<span class="spinner dark"></span> 작성 중…';
   let last="";
   for(let attempt=1;attempt<=2;attempt++){
     try{
-      const raw=await callClaude([{role:"user",content:planPrompt(p,s)}],2800);
+      if(!silent&&msgEl) msgEl.innerHTML='<span class="spinner dark"></span> 작성 중…'+(attempt>1?" (재시도)":"");
+      const call=callClaude([{role:"user",content:planPrompt(p,s,attempt===2)}],attempt===1?3500:2500);
+      const timeout=new Promise(function(_,rej){ setTimeout(function(){ rej(new Error("SERVER::응답 시간 초과(90초)")); },90000); });
+      const raw=await Promise.race([call,timeout]);
       const t=String(raw||"").replace(/^#+ /gm,"■ ").trim();
       if(t.length>=120){
         s.text=t; p.at=Date.now(); p.atStr=fmtDate(new Date());
@@ -2845,9 +2871,10 @@ async function genSection(i,silent){
         if(!silent) renderPlanEditor();
         return true;
       }
-      last="응답이 너무 짧습니다("+t.length+"자)";
+      last="응답이 비었거나 너무 짧습니다("+t.length+"자)";
     }catch(e){ last=errDetail(e)||String(e&&e.message||"오류"); }
   }
+  if(!silent&&msgEl) msgEl.innerHTML='<span style="color:var(--seal);">작성 실패: '+esc(last.slice(0,60))+'</span>';
   throw new Error("SERVER::"+last);
 }
 async function genAllSections(){
