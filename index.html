@@ -484,6 +484,7 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
         <aside class="side-panels">
           <div class="panel">
             <h3>내 사업 프로필 <button class="edit" onclick="go('profile')">수정</button></h3>
+            <div id="dash-ws" style="font-size:11px;color:var(--ink-faint);margin:-4px 0 8px;"></div>
             <div class="profile-rows" id="mini-profile"></div>
             <div class="kw" id="mini-kw"></div>
             <div class="learn-cta"><div><b>사업계획서로 학습시키기</b>매칭 정확도가 올라갑니다.</div><button class="btn" onclick="go('profile')">학습</button></div>
@@ -675,7 +676,7 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     </div>
 
     <div id="view-bank" class="view">
-      <div class="page-head"><h1>기업 데이터뱅크</h1><p>사업계획서에 반복해서 들어가는 회사 정보를 한 번만 정리해 두면, 이후 모든 지원서 작성에 자동으로 인용됩니다. AI는 <b>여기 있는 사실만</b> 사용하고, 없는 수치는 절대 지어내지 않습니다.</p></div>
+      <div class="page-head"><h1>기업 데이터뱅크 <span id="bank-ws" style="font-size:12px;color:var(--seal);font-weight:600;vertical-align:middle;"></span></h1><p>사업계획서에 반복해서 들어가는 회사 정보를 한 번만 정리해 두면, 이후 모든 지원서 작성에 자동으로 인용됩니다. AI는 <b>여기 있는 사실만</b> 사용하고, 없는 수치는 절대 지어내지 않습니다.</p></div>
       <div class="panel" style="margin-bottom:16px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <b style="font-size:14px;">작성 완성도</b><span id="bank-pct" style="font-family:var(--serif);font-weight:800;font-size:18px;"></span>
@@ -1342,6 +1343,8 @@ function matchedList(){
   return mid.slice(0,5);
 }
 function renderDash(){
+  var _dw=document.getElementById("dash-ws");
+  if(_dw) _dw.textContent = WS ? ("프로젝트: "+WS.name) : "";
   if(annSource==="loading"&&!ANNS.length){
     document.getElementById("brief-title").innerHTML='공고를 불러오는 중입니다…';
     document.getElementById("dash-list").innerHTML='<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
@@ -1733,6 +1736,48 @@ async function pdfToText(file, onProgress){
   return out.join("\n\n").replace(/[ \t]+/g," ").replace(/\n{3,}/g,"\n\n").trim();
 }
 // 글자 추출이 안 되는 PDF(피그마 아웃라인·스캔본)를 페이지 이미지로 변환
+async function pdfPageCount(file){
+  try{ const lib=await loadPdfJs(); const buf=await file.arrayBuffer(); const doc=await lib.getDocument({data:buf}).promise; return doc.numPages; }catch(e){ return 0; }
+}
+// 지정 구간(from~to)만 이미지로 변환
+async function pdfToImagesRange(file, from, to, onProgress){
+  const lib=await loadPdfJs();
+  const buf=await file.arrayBuffer();
+  const doc=await lib.getDocument({data:buf}).promise;
+  const last=Math.min(to,doc.numPages);
+  const out=[];
+  for(let i=from;i<=last;i++){
+    if(onProgress) onProgress(i,doc.numPages);
+    const page=await doc.getPage(i);
+    const v1=page.getViewport({scale:1});
+    const scale=Math.min(2, Math.max(1, 1300/v1.width));
+    const vp=page.getViewport({scale:scale});
+    const cv=document.createElement("canvas");
+    cv.width=Math.floor(vp.width); cv.height=Math.floor(vp.height);
+    const ctx=cv.getContext("2d");
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,cv.width,cv.height);
+    await page.render({canvasContext:ctx,viewport:vp}).promise;
+    let q=0.7, url=cv.toDataURL("image/jpeg",q);
+    while(url.length>800000&&q>0.4){ q-=0.1; url=cv.toDataURL("image/jpeg",q); }
+    out.push({type:"image",source:{type:"base64",media_type:"image/jpeg",data:url.split(",")[1]}});
+  }
+  return {images:out,total:doc.numPages,used:out.length};
+}
+// 전체 페이지를 6쪽씩 나눠 읽고 합침 (쪽수 제한 없음)
+async function pdfReadAll(file, instruction, onProgress){
+  const total=await pdfPageCount(file);
+  if(!total) throw new Error("SERVER::PDF를 열 수 없습니다.");
+  const STEP=6, parts=[];
+  for(let s=1;s<=total;s+=STEP){
+    const e=Math.min(s+STEP-1,total);
+    if(onProgress) onProgress("convert",s,e,total);
+    const r=await pdfToImagesRange(file,s,e);
+    if(onProgress) onProgress("read",s,e,total);
+    const txt=await callClaude([{role:"user",content:r.images.concat([{type:"text",text:"위 이미지는 문서의 "+s+"~"+e+"쪽입니다(전체 "+total+"쪽). 이 구간에 담긴 글자·표·도표·수치를 빠짐없이 읽어 원문에 가깝게 정리해라. 요약하지 말고 내용을 보존해라. 임의로 추측하거나 지어내지 마라."}])}],7000);
+    parts.push("[ "+s+"~"+e+"쪽 ]\n"+txt);
+  }
+  return {text:parts.join("\n\n"),total:total};
+}
 async function pdfToImages(file, maxPages, onProgress){
   const lib=await loadPdfJs();
   const buf=await file.arrayBuffer();
@@ -1955,10 +2000,12 @@ async function analyzeOne(source, prevLearned){
     if(txt.length>=150){
       content=prompt+"\n\n[문서 내용 — "+source.file.name+"]\n"+txt.slice(0,60000);
     }else{
-      // 글자가 도형으로 변환된 PDF(피그마 등) → 페이지를 이미지로 변환해 AI가 읽음
+      // 글자가 도형으로 된 PDF(피그마 등) → 전체 페이지를 나눠 읽어 합침
       const btn2=document.getElementById("analyze-btn");
-      const r=await pdfToImages(source.file,8,function(p,n,tot){ if(btn2) btn2.innerHTML='<span class="spinner"></span> 이미지로 변환 중… '+p+'/'+n+'쪽'+(tot>n?(" (전체 "+tot+"쪽 중 앞 "+n+"쪽)"):""); });
-      content=r.images.concat([{type:"text",text:prompt+"\n\n위 이미지는 사업 자료 "+source.file.name+"의 페이지입니다"+(r.total>r.used?(" (전체 "+r.total+"쪽 중 앞 "+r.used+"쪽)"):"")+". 이미지에 담긴 글자·표·도표를 모두 읽고 분석해라."}]);
+      const rr=await pdfReadAll(source.file,"",function(stage,s,e,tot){
+        if(btn2) btn2.innerHTML='<span class="spinner"></span> '+(stage==="convert"?"이미지 변환":"내용 읽는 중")+' '+s+'~'+e+'쪽 / 전체 '+tot+'쪽';
+      });
+      content=prompt+"\n\n[문서 전문 — "+source.file.name+" (전체 "+rr.total+"쪽 모두 읽음)]\n"+rr.text.slice(0,120000);
     }
   }else{
     let txt=source.text||"";
@@ -1981,6 +2028,16 @@ async function analyzeDoc(){
   });
   if(paste) jobs.push({text:paste,name:"붙여넣은 텍스트"});
   if(!jobs.length){ out.innerHTML='<div class="err-box">파일을 올리거나 내용을 붙여넣은 뒤 분석을 시작하세요.</div>'; return; }
+  // 글자 없는 대용량 PDF는 시간이 걸리므로 사전 안내
+  for(const j of jobs){
+    if(j.file&&/pdf$/i.test(j.file.type||j.file.name||"")){
+      const n=await pdfPageCount(j.file);
+      if(n>12){
+        const ok=await uiConfirm(j.file.name+" 은(는) 총 "+n+"쪽입니다.\n\n글자 추출이 되지 않는 PDF일 경우 전체를 이미지로 읽게 되며, 약 "+Math.ceil(n/6)+"회에 걸쳐 처리되어 "+Math.ceil(n/6*25)+"초 정도 걸립니다.\n\n전체를 읽을까요?","긴 문서 안내");
+        if(!ok){ out.innerHTML='<p class="mini-note">분석을 취소했습니다.</p>'; btn.disabled=false; btn.textContent="AI 비서로 분석해서 학습하기"; return; }
+      }
+    }
+  }
   btn.disabled=true; out.innerHTML="";
   const done=[], skipped=[];
   try{
@@ -2943,7 +3000,15 @@ async function loadWorkspaces(){
     let sel=null;
     try{ sel=localStorage.getItem(wsKey()); }catch(e){}
     WS=WSLIST.find(function(o){return o.id===sel;})||WSLIST[0]||null;
-    if(WS){ await wsLoad(true); startWsPoll(); }
+    if(WS){
+      const st=await wsLoad(true);
+      if(st==="empty"){
+        // 데이터가 없는 프로젝트: 개인 프로필을 초기 데이터로 이관
+        if(PROFILE.company) await wsSave();
+        else { PROFILE=blankProfile(WS.name); }
+      }
+      startWsPoll();
+    }
     renderWsBox();
     if(PENDING_JOIN&&WS){
       PENDING_JOIN=false;
@@ -2966,26 +3031,51 @@ function wsSyncBadge(t,color){
 }
 async function switchWs(id){
   if(id==="__new"){ renderWsBox(); go("team"); setTimeout(function(){ const i=document.getElementById("org-name"); if(i)i.focus(); },300); return; }
-  const o=WSLIST.find(function(x){return x.id===id;}); if(!o) return;
+  const o=WSLIST.find(function(x){return x.id===id;}); if(!o||(WS&&WS.id===id)) return;
+  const prevProfile=JSON.parse(JSON.stringify(PROFILE)), prevScraps=JSON.parse(JSON.stringify(scraps));
   WS=o; try{ localStorage.setItem(wsKey(),id); }catch(e){}
-  wsSyncBadge("불러오는 중…","#8a6d00");
-  await wsLoad(true);
-  await loadOrg();
-  enterApp();
+  wsSyncBadge("전환 중…","#8a6d00");
+  const st=await wsLoad(true);
+  if(st==="empty"){
+    const v=await showModal({title:"새 프로젝트입니다",icon:"＋",
+      msg:"'"+o.name+"' 프로젝트에는 아직 저장된 데이터가 없습니다.\n\n직전에 보던 데이터를 이 프로젝트로 복사해 시작할까요?\n(아니오를 선택하면 빈 상태로 시작합니다)",
+      cancel:true, okText:"복사해서 시작"});
+    if(v!==null){ PROFILE=prevProfile; scraps=prevScraps; PROFILE.company=PROFILE.company||o.name; }
+    else { PROFILE=blankProfile(o.name); scraps={}; }
+    rescoreAll();
+    await wsSave();
+  }
+  document.getElementById("greet-name").textContent=greet();
+  rescoreAll(); applyAiCache();
+  const v2=currentView;
+  if(v2==="dashboard")renderDash(); else if(v2==="bank")renderBank();
+  else if(v2==="profile")fillProfileForm(); else if(v2==="scrap")renderScrap();
+  else if(v2==="bookmark")renderBookmarks(); else if(v2==="writer"){curPlan=null;renderWriter();}
+  else if(v2==="roadmap")showRoadmap(); else if(v2==="search")renderSearch();
+  else if(v2==="calendar")renderCal(); else if(v2==="insight")renderInsightView();
+  else go("dashboard");
+  wsSyncBadge("공유 중");
+  showToast("'"+o.name+"' 프로젝트 · "+(PROFILE.company||"회사명 미입력"));
+  loadOrg();
+  startWsPoll();
 }
 async function wsLoad(apply){
-  if(!sb||!WS) return false;
+  if(!sb||!WS) return "fail";
   try{
     const {data}=await sb.from("org_data").select("*").eq("org_id",WS.id).maybeSingle();
-    if(!data||!data.data){ WS_AT=0; return false; }
+    if(!data||!data.data||!data.data.profile){ WS_AT=0; return "empty"; }
     WS_AT=new Date(data.updated_at||0).getTime();
-    if(apply&&data.data.profile){
+    if(apply){
       PROFILE=data.data.profile;
-      if(data.data.scraps&&typeof data.data.scraps==="object") scraps=data.data.scraps;
+      PROFILE.extra=PROFILE.extra||{};
+      scraps=(data.data.scraps&&typeof data.data.scraps==="object")?data.data.scraps:{};
       rescoreAll();
     }
-    return true;
-  }catch(e){ return false; }
+    return "ok";
+  }catch(e){ return "fail"; }
+}
+function blankProfile(name){
+  return {company:name||"",industry:"",founded:"",region:"",staff:"",revenue:"",descr:"",keywords:[],extra:{}};
 }
 async function wsSave(){
   if(!sb||!WS||WS_SAVING) return false;
@@ -3268,6 +3358,7 @@ const BANK_FIELDS=BANK_GROUPS.reduce(function(a,g){return a.concat(g.items);},[]
 function bank(){ PROFILE.extra=PROFILE.extra||{}; PROFILE.extra.bank=PROFILE.extra.bank||{}; return PROFILE.extra.bank; }
 function bankFilled(){ const b=bank(); return BANK_FIELDS.filter(function(f){return (b[f.k]||"").trim().length>=20;}).length; }
 function renderBank(){
+  var _bw=document.getElementById("bank-ws"); if(_bw) _bw.textContent = WS?("· "+WS.name):"";
   const b=bank(), n=bankFilled(), pct=Math.round(n/BANK_FIELDS.length*100);
   const reqs=BANK_FIELDS.filter(function(f){return f.req;});
   const reqDone=reqs.filter(function(f){return (b[f.k]||"").trim().length>=20;}).length;
@@ -3519,9 +3610,9 @@ async function buildPlan(idx,useForm){
         if(rawTxt.length>=150){
           ext=await callClaude([{role:"user",content:"다음은 사업계획서 양식 문서 원문이다. 목차 구조를 빠짐없이 그대로 추출해라. 항목 번호·제목·배점·분량 제한이 있으면 함께. 목록만 출력.\n\n"+rawTxt.slice(0,40000)}],5000);
         } else {
-          log("&nbsp;&nbsp;→ 글자 추출 불가 — 페이지를 이미지로 변환해 읽는 중…");
-          const ri=await pdfToImages(formFile,8,function(pg,n){ log("&nbsp;&nbsp;&nbsp;&nbsp;"+pg+"/"+n+"쪽"); });
-          ext=await callClaude([{role:"user",content:ri.images.concat([{type:"text",text:"위 이미지는 사업계획서 양식 문서의 페이지입니다. 목차 구조(항목 번호·제목·배점·분량)를 빠짐없이 그대로 추출해라. 목록만 출력."}])}],5000);
+          log("&nbsp;&nbsp;→ 글자 추출 불가 — 전체 페이지를 이미지로 읽는 중…");
+          const rr=await pdfReadAll(formFile,"",function(stage,s,e,tot){ log("&nbsp;&nbsp;&nbsp;&nbsp;"+(stage==="convert"?"변환":"읽기")+" "+s+"~"+e+"/"+tot+"쪽"); });
+          ext=rr.text.slice(0,40000);
         }
         formTxt=(formTxt?formTxt+"\n":"")+ext;
       }else{
@@ -3658,9 +3749,8 @@ async function addRefs(input){
           if(msg) msg.innerHTML='<span class="spinner dark"></span> '+esc(f.name)+' 요약 중…';
           txt=await callClaude([{role:"user",content:"다음 문서의 핵심 내용을 사업계획서 작성에 참고할 수 있도록 구조적으로 정리해라. 수치·근거·표현을 최대한 보존. 3000자 이내.\n\n"+raw.slice(0,50000)}],6000);
         } else {
-          if(msg) msg.innerHTML='<span class="spinner dark"></span> '+esc(f.name)+' 이미지로 변환 중…';
-          const ri=await pdfToImages(f,8,function(pg,n){ if(msg) msg.innerHTML='<span class="spinner dark"></span> 이미지 변환 '+pg+'/'+n+'쪽'; });
-          txt=await callClaude([{role:"user",content:ri.images.concat([{type:"text",text:"위 이미지는 참고 문서의 페이지입니다. 담긴 글자·표·도표를 모두 읽고, 사업계획서 작성에 참고할 수 있도록 핵심을 구조적으로 정리해라. 3000자 이내."}])}],6000);
+          const rr=await pdfReadAll(f,"",function(stage,s,e,tot){ if(msg) msg.innerHTML='<span class="spinner dark"></span> '+esc(f.name)+' '+(stage==="convert"?"변환":"읽는 중")+' '+s+'~'+e+'/'+tot+'쪽'; });
+          txt=rr.text.slice(0,60000);
         }
       }else{ txt=(await f.text()).slice(0,20000); }
       p.refs.push({name:f.name,text:txt});
