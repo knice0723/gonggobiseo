@@ -238,6 +238,9 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
 .cal-cell:nth-child(7n){border-right:none;}
 .cal-cell .d{color:var(--ink-faint);font-weight:600;}
 .cal-cell.today .d{background:var(--ink);color:#fff;border-radius:99px;padding:1px 6px;}
+.cal-ev.scrap{background:var(--seal-wash);color:var(--seal-deep);}
+.cal-ev.apply{background:#fff3e0;color:#8a5a00;}
+.cal-ev.done{background:#e7f5ec;color:#1a7f37;}
 .cal-ev{margin-top:4px;font-size:10.5px;font-weight:700;line-height:1.3;background:var(--seal-wash);color:var(--seal-deep);border-radius:4px;padding:2px 5px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;cursor:pointer;}
 .cal-ev.navy{background:var(--navy-wash);color:var(--navy);}
 .cal-legend{padding:10px 18px;font-size:12px;color:var(--ink-soft);display:flex;gap:16px;border-top:1px solid var(--line-soft);flex-wrap:wrap;}
@@ -324,7 +327,10 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
   .side-panels{grid-template-columns:1fr;}
   .detail-top{flex-direction:column-reverse;}
   .cal-cell{min-height:58px;padding:4px 4px;}
-  .cal-ev{font-size:9px;}
+  .cal-ev.scrap{background:var(--seal-wash);color:var(--seal-deep);}
+.cal-ev.apply{background:#fff3e0;color:#8a5a00;}
+.cal-ev.done{background:#e7f5ec;color:#1a7f37;}
+.cal-ev{font-size:9px;}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important;}}
 </style>
@@ -430,13 +436,13 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     <button class="nav-item" data-nav="scrap" onclick="go('scrap')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5h6a2 2 0 012 2v13H7V7a2 2 0 012-2zM9 3h6v4H9zM9 12h6M9 16h4"/></svg>지원 현황</button>
     <div class="nav-label">AI</div>
     <button class="nav-item" data-nav="profile" onclick="go('profile')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5M5 3h9l5 5v13H5V3z"/></svg>사업 프로필 · 문서 학습</button>
-    <button class="nav-item" data-nav="team" onclick="go('team')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 108 0 4 4 0 10-8 0M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>팀 · 협업</button>
     <button class="nav-item" data-nav="bank" onclick="go('bank')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>기업 데이터뱅크</button>
     <button class="nav-item" data-nav="writer" onclick="go('writer')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>사업계획서 작성<span class="cnt" style="background:var(--seal);color:#fff;">NEW</span></button>
     <button class="nav-item" data-nav="roadmap" onclick="go('roadmap')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20l6-3 6 3 6-3V4l-6 3-6-3-6 3v16zM9 4v13M15 7v13"/></svg>성장 로드맵</button>
     <button class="nav-item" onclick="openChat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/></svg>AI 비서에게 질문하기</button>
     <div class="nav-label">설정</div>
     <button class="nav-item" data-nav="alerts" onclick="go('alerts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a2 2 0 003.4 0"/></svg>알림 설정</button>
+    <button class="nav-item" data-nav="team" onclick="go('team')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 108 0 4 4 0 10-8 0M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>팀 · 협업</button>
     <button class="nav-item hidden" id="nav-admin" data-nav="admin" onclick="go('admin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3 1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9 1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>ADMIN</button>
     <div class="sidebar-foot"><span id="side-src">공고 수집 대기 중</span><br><span style="font-size:11px;">공고 출처: K-Startup · 중소벤처24 · 기업마당 · 과기부(공공데이터)</span></div>
   </aside>
@@ -506,7 +512,13 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     <div id="view-detail" class="view"></div>
 
     <div id="view-calendar" class="view">
-      <div class="page-head"><h1>마감 캘린더</h1><p>스크랩 공고(빨강)와 맞춤·전체 공고(남색)의 접수 마감일입니다.</p></div>
+      <div class="page-head"><h1>마감 캘린더</h1><p>공고 상태별로 색이 다릅니다.</p>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);margin-bottom:12px;">
+        <span><span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:var(--navy-wash);border:1px solid var(--navy);vertical-align:-1px;"></span> 맞춤 공고</span>
+        <span><span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:var(--seal-wash);border:1px solid var(--seal);vertical-align:-1px;"></span> 스크랩</span>
+        <span><span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:#fff3e0;border:1px solid #d99b00;vertical-align:-1px;"></span> 작성·지원 중</span>
+        <span><span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:#e7f5ec;border:1px solid #1a7f37;vertical-align:-1px;"></span> 선정·수행</span>
+      </div></div>
       <div class="tabs" id="cal-tabs" style="margin-bottom:14px;">
         <button class="tab active" data-cm="match">맞춤·스크랩</button>
         <button class="tab" data-cm="all">전체 공고</button>
@@ -717,9 +729,15 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);}
     </div>
 
     <div id="view-admin" class="view">
-      <div class="page-head"><h1>운영 관리 (ADMIN)</h1><p>가입 회원과 사용 현황입니다. 관리자 계정에만 표시됩니다.</p></div>
-      <div class="head-stats" style="margin-bottom:16px;flex-wrap:wrap;" id="admin-stats"></div>
-      <div class="panel" style="overflow-x:auto;"><div id="admin-body"><p class="mini-note">불러오는 중…</p></div></div>
+      <div class="page-head"><h1>운영 관리 (ADMIN)</h1><p>공고비서 전체 운영 현황입니다. 관리자 계정에만 표시됩니다.</p></div>
+      <div class="tabs" id="admin-tabs" style="margin-bottom:16px;">
+        <button class="tab active" data-at="dash">대시보드</button>
+        <button class="tab" data-at="users">회원 관리</button>
+        <button class="tab" data-at="usage">이용 현황</button>
+        <button class="tab" data-at="content">콘텐츠 현황</button>
+        <button class="tab" data-at="system">시스템 점검</button>
+      </div>
+      <div id="admin-body"><p class="mini-note">불러오는 중…</p></div>
     </div>
 
   </main>
@@ -794,61 +812,126 @@ let PROFILE = {
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function mdLite(t){return esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/^#{2,3} (.+)$/gm,"<b>$1</b>");}
 function mdDiagram(title,lines){
-  // esc() 이후 들어오므로 엔티티 복원 후 파싱
   const dec=function(s){ return String(s).replace(/&gt;/g,">").replace(/&lt;/g,"<").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'"); };
-  const seq=[], flat=[];
-  lines.forEach(function(raw){
-    const t=dec(raw).trim(); if(!t) return;
-    if(/(->|→|⇒|=>)/.test(t)){
-      const parts=t.split(/\s*(?:->|→|⇒|=>)\s*/).map(function(x){return x.replace(/^[-•*ㅇ]\s*/,"").trim();}).filter(Boolean);
-      if(parts.length>1) seq.push(parts); else if(parts[0]) flat.push(parts[0]);
-    } else {
-      const nm=t.replace(/^[-•*ㅇ○◦\d.)]+\s*/,"").trim();
-      if(nm) flat.push(nm);
-    }
-  });
-  if(!seq.length&&!flat.length) return "";
   const esc2=function(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
-  const wrap=function(s,per){ const out=[]; let cur=""; String(s).split(/\s+/).forEach(function(w){ if((cur+" "+w).trim().length>per){ out.push(cur.trim()); cur=w; } else cur+=" "+w; }); if(cur.trim())out.push(cur.trim()); return out.slice(0,3); };
-  const W=880, PAD=26, TH=title?42:16;
-  const bw=176, bh=62, gx=54, gy=40;
-  let rows=[];
-  if(seq.length){ seq.forEach(function(s){ // 한 줄에 4개 초과 시 접기
-      for(let i=0;i<s.length;i+=4) rows.push({items:s.slice(i,i+4),chain:true});
-    }); }
-  if(flat.length){ for(let i=0;i<flat.length;i+=3) rows.push({items:flat.slice(i,i+3),chain:false}); }
-  const H=TH+rows.length*(bh+gy)+PAD;
-  let svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:linear-gradient(180deg,#fffefb,#faf8f4);border:1px solid #e8e2d8;border-radius:10px;margin:14px 0;">';
-  svg+='<defs><marker id="dgar" markerWidth="10" markerHeight="10" refX="9" refY="3.2" orient="auto"><path d="M0,0 L0,6.4 L9,3.2 z" fill="#b22222"/></marker>'+
-    '<linearGradient id="dgbx" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#fdf6f2"/></linearGradient>'+
-    '<filter id="dgsh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#8a2b2b" flood-opacity="0.13"/></filter></defs>';
-  if(title){
-    svg+='<text x="'+PAD+'" y="27" style="font:800 15px \'Noto Serif KR\',serif;fill:#2c2a26;">'+esc2(dec(title))+'</text>';
-    svg+='<line x1="'+PAD+'" y1="34" x2="'+(W-PAD)+'" y2="34" stroke="#eee6da" stroke-width="1"/>';
-  }
-  rows.forEach(function(row,ri){
-    const n=row.items.length;
-    const totalW=n*bw+(n-1)*gx;
-    const startX=(W-totalW)/2;
-    const y=TH+ri*(bh+gy);
-    row.items.forEach(function(nm,i){
-      const x=startX+i*(bw+gx);
-      svg+='<rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+bh+'" rx="11" fill="url(#dgbx)" stroke="#b22222" stroke-width="1.5" filter="url(#dgsh)"/>';
-      const ls=wrap(nm,14);
-      const startY=y+bh/2-((ls.length-1)*7.5)+4.5;
-      ls.forEach(function(l,li){
-        svg+='<text x="'+(x+bw/2)+'" y="'+(startY+li*15)+'" text-anchor="middle" style="font:600 12px \'Pretendard\',sans-serif;fill:#2c2a26;">'+esc2(l)+'</text>';
+  const T=dec(title||"");
+  const raw=lines.map(dec).map(function(s){return s.trim();}).filter(Boolean);
+  if(!raw.length) return "";
+
+  /* ── 문법 1: 열(레인) 구조 — @열: A | B | C  +  행: a | b | c ── */
+  let cols=null; const rows=[];
+  raw.forEach(function(l){
+    const m=l.match(/^@(?:열|칼럼|레인|col)\s*[:：]\s*(.+)$/);
+    if(m){ cols=m[1].split("|").map(function(x){return x.trim();}).filter(Boolean); return; }
+    if(l.indexOf("|")>0){
+      const cells=l.replace(/^[\d]+[).]\s*/,"").split("|").map(function(x){return x.trim();});
+      if(cells.length>1){ rows.push(cells); return; }
+    }
+    rows.push([l]);
+  });
+
+  const wrap=function(s,per){ const out=[]; let cur=""; String(s).split(/[\s·]+/).forEach(function(w){ if((cur+" "+w).trim().length>per){ if(cur)out.push(cur.trim()); cur=w; } else cur+=" "+w; }); if(cur.trim())out.push(cur.trim()); return out.slice(0,3); };
+  const box=function(x,y,w,h,txt,accent){
+    let s='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="10" fill="#fff" stroke="'+(accent||"#c0392b")+'" stroke-width="1.5" filter="url(#dgsh)"/>';
+    const ls=wrap(txt,Math.floor(w/12));
+    const sy=y+h/2-((ls.length-1)*8)+4.5;
+    ls.forEach(function(l,i){ s+='<text x="'+(x+w/2)+'" y="'+(sy+i*16)+'" text-anchor="middle" style="font:600 12.5px \'Pretendard\',-apple-system,sans-serif;fill:#2c2a26;">'+esc2(l)+'</text>'; });
+    return s;
+  };
+  const defs='<defs><marker id="dgar" markerWidth="10" markerHeight="10" refX="9" refY="3.2" orient="auto"><path d="M0,0 L0,6.4 L9,3.2 z" fill="#c0392b"/></marker>'+
+    '<filter id="dgsh" x="-20%" y="-25%" width="145%" height="160%"><feDropShadow dx="0" dy="2" stdDeviation="2.4" flood-color="#8a2b2b" flood-opacity="0.13"/></filter></defs>';
+  const head=function(W){
+    let s='';
+    if(T){
+      s+='<rect x="'+(W/2-Math.min(W*0.44,T.length*9))+'" y="14" width="'+(Math.min(W*0.88,T.length*18))+'" height="34" rx="17" fill="#fdf4f1" stroke="#e8d5cf"/>';
+      s+='<text x="'+(W/2)+'" y="37" text-anchor="middle" style="font:800 16px \'Noto Serif KR\',serif;fill:#2c2a26;">'+esc2(T)+'</text>';
+    }
+    return s;
+  };
+
+  /* ── 레인 그리드 렌더 (목표 품질) ── */
+  const maxCells=rows.reduce(function(m,r){return Math.max(m,r.length);},0);
+  if(maxCells>1){
+    const nc=cols?Math.max(cols.length,maxCells):maxCells;
+    const bw=Math.min(230,Math.max(150,Math.floor(880/nc)-46));
+    const gx=44, gy=18, bh=64;
+    const numW=cols?34:0;
+    const W=numW+nc*bw+(nc-1)*gx+56;
+    const TOP=(T?62:16)+(cols?42:0);
+    const H=TOP+rows.length*(bh+gy)+18;
+    let svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:#fff;border:1px solid #ece5db;border-radius:12px;margin:14px 0;">'+defs+head(W);
+    const x0=28+numW;
+    if(cols){
+      cols.forEach(function(c,i){
+        const cx=x0+i*(bw+gx)+bw/2;
+        svg+='<text x="'+cx+'" y="'+((T?62:16)+16)+'" text-anchor="middle" style="font:800 12.5px \'Pretendard\',sans-serif;fill:#c0392b;">'+esc2(c)+'</text>';
+        svg+='<line x1="'+(cx-bw/2)+'" y1="'+((T?62:16)+26)+'" x2="'+(cx+bw/2)+'" y2="'+((T?62:16)+26)+'" stroke="#f0dcd6" stroke-width="2"/>';
       });
-      if(row.chain&&i<n-1){
-        const ax=x+bw+6, ay=y+bh/2;
-        svg+='<line x1="'+ax+'" y1="'+ay+'" x2="'+(ax+gx-14)+'" y2="'+ay+'" stroke="#b22222" stroke-width="1.8" marker-end="url(#dgar)"/>';
+    }
+    rows.forEach(function(r,ri){
+      const y=TOP+ri*(bh+gy);
+      if(cols&&numW){
+        svg+='<circle cx="18" cy="'+(y+bh/2)+'" r="12" fill="#c0392b"/>';
+        svg+='<text x="18" y="'+(y+bh/2+4.5)+'" text-anchor="middle" style="font:800 12px sans-serif;fill:#fff;">'+(ri+1)+'</text>';
+        svg+='<line x1="32" y1="'+(y+bh/2)+'" x2="'+(x0-8)+'" y2="'+(y+bh/2)+'" stroke="#efe3dd" stroke-width="1.5" stroke-dasharray="3 3"/>';
       }
+      r.forEach(function(c,ci){
+        if(!c) return;
+        const x=x0+ci*(bw+gx);
+        svg+=box(x,y,bw,bh,c);
+        if(ci<r.length-1&&r[ci+1]){
+          svg+='<line x1="'+(x+bw+6)+'" y1="'+(y+bh/2)+'" x2="'+(x+bw+gx-10)+'" y2="'+(y+bh/2)+'" stroke="#c0392b" stroke-width="1.8" marker-end="url(#dgar)"/>';
+        }
+      });
     });
-    if(row.chain&&ri<rows.length-1&&rows[ri+1].chain){
-      const cx=W/2, y1=y+bh+4, y2=y+bh+gy-6;
-      svg+='<line x1="'+cx+'" y1="'+y1+'" x2="'+cx+'" y2="'+y2+'" stroke="#b22222" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#dgar)"/>';
+    return svg+'</svg>';
+  }
+
+  /* ── 단일 흐름 렌더 ── */
+  const nodes=[], edges=[]; let hasArrow=false;
+  const add=function(n){ const t=String(n).trim(); if(!t) return -1; let i=nodes.indexOf(t); if(i<0){nodes.push(t);i=nodes.length-1;} return i; };
+  raw.forEach(function(l){
+    let t=l.replace(/^[-•*ㅇ○◦\d.)]+\s*/,"");
+    if(/(->|→|⇒|=>)/.test(t)){
+      hasArrow=true;
+      const ps=t.split(/\s*(?:->|→|⇒|=>)\s*/).map(function(x){return x.trim();}).filter(Boolean);
+      for(let i=0;i<ps.length;i++){ const a=add(ps[i]); if(i>0) edges.push([add(ps[i-1]),a]); }
+    } else if(t) add(t);
+  });
+  if(!nodes.length) return "";
+  const isCycle=/순환|선순환|사이클|루프|피드백/.test(T);
+  if(!hasArrow&&nodes.length>1) for(let i=1;i<nodes.length;i++) edges.push([i-1,i]);
+  const per=nodes.length<=3?nodes.length:(nodes.length<=8?3:4);
+  const bw=Math.min(215,Math.max(155,Math.floor(860/per)-50)), bh=66, gx=52, gy=44;
+  const W=900, TOP=T?66:18;
+  const rowsN=Math.ceil(nodes.length/per);
+  const H=TOP+rowsN*bh+(rowsN-1)*gy+(isCycle?36:20);
+  const pos=[];
+  let svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:#fff;border:1px solid #ece5db;border-radius:12px;margin:14px 0;">'+defs+head(W);
+  nodes.forEach(function(n,i){
+    const r=Math.floor(i/per), c=i%per, cnt=Math.min(per,nodes.length-r*per);
+    const tw=cnt*bw+(cnt-1)*gx, rev=(r%2===1);
+    const cc=rev?(cnt-1-c):c;
+    const x=(W-tw)/2+cc*(bw+gx), y=TOP+r*(bh+gy);
+    pos[i]={x:x,y:y,r:r};
+    svg+=box(x,y,bw,bh,n);
+    svg+='<circle cx="'+(x+13)+'" cy="'+(y+13)+'" r="10" fill="#c0392b"/><text x="'+(x+13)+'" y="'+(y+17)+'" text-anchor="middle" style="font:800 11px sans-serif;fill:#fff;">'+(i+1)+'</text>';
+  });
+  edges.forEach(function(e){
+    const a=pos[e[0]], b=pos[e[1]]; if(!a||!b) return;
+    if(a.r===b.r){
+      const l2r=a.x<b.x;
+      svg+='<line x1="'+(l2r?a.x+bw+6:a.x-6)+'" y1="'+(a.y+bh/2)+'" x2="'+(l2r?b.x-9:b.x+bw+9)+'" y2="'+(b.y+bh/2)+'" stroke="#c0392b" stroke-width="1.8" marker-end="url(#dgar)"/>';
+    }else{
+      const x1=a.x+bw/2, x2=b.x+bw/2, mid=(a.y+bh+b.y)/2;
+      svg+='<path d="M'+x1+','+(a.y+bh+5)+' L'+x1+','+mid+' L'+x2+','+mid+' L'+x2+','+(b.y-9)+'" fill="none" stroke="#c0392b" stroke-width="1.8" marker-end="url(#dgar)"/>';
     }
   });
+  if(isCycle&&nodes.length>2){
+    const last=pos[nodes.length-1], first=pos[0], y=last.y+bh+18;
+    svg+='<path d="M'+(last.x+bw/2)+','+(last.y+bh+5)+' L'+(last.x+bw/2)+','+y+' L'+(W-16)+','+y+' L'+(W-16)+','+(first.y+bh/2)+' L'+(first.x+bw+9)+','+(first.y+bh/2)+'" fill="none" stroke="#c0392b" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#dgar)"/>';
+    svg+='<text x="'+(W-26)+'" y="'+(y-7)+'" text-anchor="end" style="font:600 11px sans-serif;fill:#8a2b2b;">순환 · 재투입</text>';
+  }
   return svg+'</svg>';
 }
 
@@ -1451,7 +1534,7 @@ function renderCal(){
     const isToday=calY===TODAY.getFullYear()&&calM===TODAY.getMonth()&&d===TODAY.getDate();
     const shown=evs.slice(0,3);
     html+='<div class="cal-cell '+(isToday?"today":"")+'"><span class="d">'+d+'</span>'+
-      shown.map(({a,i})=>'<div class="cal-ev '+(scraps[a.key]!==undefined?"":"navy")+'" onclick="openDetail('+i+')" title="'+esc(a.title)+'">'+esc(a.title.replace(/^\[[^\]]*\]\s*/,"").slice(0,14))+'… 마감</div>').join("")+
+      shown.map(({a,i})=>{ const sc=scraps[a.key]; const st=sc&&sc.status; const cls=!sc?"navy":(sc.detail&&sc.detail.applied?(/(선정|수행)/.test(st||"")?"done":"apply"):"scrap"); return '<div class="cal-ev '+cls+'" onclick="openDetail('+i+')" title="'+esc(a.title)+'">'+esc(a.title.replace(/^\[[^\]]*\]\s*/,"").slice(0,14))+'… 마감</div>'; }).join("")+
       (evs.length>3?'<div class="cal-ev" style="background:none;color:var(--navy);cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();showDayAll('+calY+','+calM+','+d+')">외 '+(evs.length-3)+'건 보기</div>':'')+'</div>';
   }
   document.getElementById("cal-grid").innerHTML=html;
@@ -1849,31 +1932,217 @@ async function analyzeDoc(){
 }
 
 /* ══ 어드민 ══ */
+let ADM={loaded:false,profiles:[],scraps:[],orgs:[],logs:[],tab:"dash"};
+document.getElementById("admin-tabs").addEventListener("click",function(e){
+  const t=e.target.closest(".tab"); if(!t) return;
+  document.querySelectorAll("#admin-tabs .tab").forEach(function(x){x.classList.remove("active");});
+  t.classList.add("active"); ADM.tab=t.dataset.at; renderAdminTab();
+});
 async function loadAdmin(){
   const body=document.getElementById("admin-body");
-  const stats=document.getElementById("admin-stats");
-  if(!sb||!userId||userEmail!==ADMIN_EMAIL){ body.innerHTML='<div class="empty">관리자 계정으로 로그인해야 볼 수 있습니다.</div>'; stats.innerHTML=""; return; }
-  body.innerHTML='<p class="mini-note">불러오는 중…</p>';
-  const {data:ps,error}=await sb.from("profiles").select("*");
-  if(error){ body.innerHTML='<div class="err-box">회원 목록 조회 실패: '+esc(error.message)+'<br>Supabase에서 profiles-업데이트2.sql(어드민 정책)을 실행했는지 확인하세요.</div>'; return; }
-  const {data:sc}=await sb.from("scraps").select("user_id,status");
-  const scCnt={}, subCnt={};
-  (sc||[]).forEach(function(r){ scCnt[r.user_id]=(scCnt[r.user_id]||0)+1; if(/제출|발표|선정/.test(r.status||"")) subCnt[r.user_id]=(subCnt[r.user_id]||0)+1; });
-  const list=(ps||[]).slice().sort(function(a,b){return String(b.created_at||"").localeCompare(String(a.created_at||""));});
-  const totAi=list.reduce(function(s,p){return s+(p.ai_calls||0);},0);
-  const totLg=list.reduce(function(s,p){return s+(p.logins||0);},0);
-  stats.innerHTML='<div class="stat"><div class="num">'+list.length+'</div><div class="lbl">총 회원</div></div>'+
-    '<div class="stat"><div class="num">'+totLg+'</div><div class="lbl">누적 로그인</div></div>'+
-    '<div class="stat"><div class="num">'+totAi+'</div><div class="lbl">AI 사용 횟수</div></div>'+
-    '<div class="stat"><div class="num">'+(sc?sc.length:0)+'</div><div class="lbl">전체 스크랩</div></div>';
-  function d10(s){return s?String(s).slice(0,10):"-";}
-  body.innerHTML='<table class="admin-table"><thead><tr><th>이메일</th><th>회사</th><th>업종</th><th>지역</th><th>가입일</th><th>최근 로그인</th><th>로그인</th><th>AI 사용</th><th>스크랩</th><th>지원 진행</th><th>학습 문서</th></tr></thead><tbody>'+
-    list.map(function(p){
-      const ex=(p.extra&&typeof p.extra==="object")?p.extra:{};
-      return '<tr><td>'+esc(p.email||String(p.id).slice(0,8))+'</td><td>'+esc(p.company||"-")+'</td><td>'+esc(p.industry||"-")+'</td><td>'+esc(p.region||"-")+'</td><td>'+d10(p.created_at)+'</td><td>'+d10(p.last_login)+'</td><td>'+(p.logins||0)+'</td><td>'+(p.ai_calls||0)+'</td><td>'+(scCnt[p.id]||0)+'</td><td>'+(subCnt[p.id]||0)+'</td><td>'+((ex.docs&&ex.docs.length)||0)+'건</td></tr>';
-    }).join("")+'</tbody></table>';
+  if(!sb||!userId||userEmail!==ADMIN_EMAIL){ body.innerHTML='<div class="empty">관리자 계정으로 로그인해야 볼 수 있습니다.</div>'; return; }
+  body.innerHTML='<div class="panel"><span class="spinner dark"></span> 데이터를 불러오는 중…</div>';
+  try{
+    const [p,s,o,l]=await Promise.all([
+      sb.from("profiles").select("*"),
+      sb.from("scraps").select("*"),
+      sb.from("orgs").select("*").then(function(r){return r;},function(){return {data:[]};}),
+      sb.from("org_logs").select("*").order("created_at",{ascending:false}).limit(100).then(function(r){return r;},function(){return {data:[]};})
+    ]);
+    if(p.error) throw new Error(p.error.message);
+    ADM.profiles=p.data||[]; ADM.scraps=s.data||[]; ADM.orgs=(o&&o.data)||[]; ADM.logs=(l&&l.data)||[];
+    ADM.loaded=true;
+    renderAdminTab();
+  }catch(e){
+    body.innerHTML='<div class="err-box">데이터 조회 실패: '+esc(String(e.message||e))+'<br>Supabase에서 profiles-업데이트2.sql(어드민 정책)과 팀협업-업데이트3.sql을 실행했는지 확인하세요.</div>';
+  }
+}
+function admStat(n,l,sub){ return '<div class="stat"><div class="num">'+n+'</div><div class="lbl">'+l+'</div>'+(sub?'<div style="font-size:11px;color:var(--ink-faint);margin-top:2px;">'+sub+'</div>':'')+'</div>'; }
+function admDate(s){ return s?String(s).slice(0,10):"-"; }
+function admDaysAgo(s){ if(!s) return 9999; return Math.floor((Date.now()-new Date(s).getTime())/86400000); }
+function renderAdminTab(){
+  const body=document.getElementById("admin-body");
+  const P=ADM.profiles, S=ADM.scraps;
+  const ex=function(p){ return (p.extra&&typeof p.extra==="object")?p.extra:{}; };
+  const scByUser={}, subByUser={};
+  S.forEach(function(r){ scByUser[r.user_id]=(scByUser[r.user_id]||0)+1; if(r.detail&&r.detail.applied) subByUser[r.user_id]=(subByUser[r.user_id]||0)+1; });
+  const totAi=P.reduce(function(a,p){return a+(p.ai_calls||0);},0);
+  const totLg=P.reduce(function(a,p){return a+(p.logins||0);},0);
+  const act7=P.filter(function(p){return admDaysAgo(p.last_login)<=7;}).length;
+  const act30=P.filter(function(p){return admDaysAgo(p.last_login)<=30;}).length;
+  const new7=P.filter(function(p){return admDaysAgo(p.created_at)<=7;}).length;
+  const withBank=P.filter(function(p){const b=ex(p).bank||{};return Object.keys(b).filter(function(k){return String(b[k]||"").length>=20;}).length>=5;}).length;
+  const withPlan=P.filter(function(p){return Object.keys(ex(p).plans||{}).length>0;}).length;
+  const withRoad=P.filter(function(p){return !!(ex(p).roadmap);}).length;
+  const totPlans=P.reduce(function(a,p){return a+Object.keys(ex(p).plans||{}).length;},0);
+  const totDocs=P.reduce(function(a,p){return a+((ex(p).docs||[]).length);},0);
+
+  if(ADM.tab==="dash"){
+    const sorted=P.slice().sort(function(a,b){return (b.ai_calls||0)-(a.ai_calls||0);}).slice(0,8);
+    const stByStatus={};
+    S.forEach(function(r){ const k=r.status||"검토 중"; stByStatus[k]=(stByStatus[k]||0)+1; });
+    body.innerHTML=
+      '<div class="head-stats" style="flex-wrap:wrap;margin-bottom:16px;">'+
+        admStat(P.length,"총 회원","최근 7일 +"+new7)+
+        admStat(act7,"주간 활성","30일 "+act30+"명")+
+        admStat(totAi,"AI 호출","1인 평균 "+(P.length?Math.round(totAi/P.length):0))+
+        admStat(S.length,"스크랩","지원 "+Object.keys(subByUser).length+"명")+
+        admStat(totPlans,"사업계획서","작성자 "+withPlan+"명")+
+      '</div>'+
+      '<div class="content-grid" style="align-items:start;">'+
+        '<div class="panel"><h3>기능별 활용률</h3>'+
+        [["기업 데이터뱅크 (5항목+)",withBank],["사업계획서 작성",withPlan],["성장 로드맵",withRoad],["문서 학습",P.filter(function(p){return (ex(p).docs||[]).length>0;}).length],["팀 협업",ADM.orgs.length]].map(function(x){
+          const pct=P.length?Math.round(x[1]/P.length*100):0;
+          return '<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px;"><span>'+x[0]+'</span><b>'+x[1]+'명 ('+pct+'%)</b></div><div class="prog"><span style="width:'+pct+'%"></span></div></div>';
+        }).join("")+'</div>'+
+        '<div class="panel"><h3>지원 단계 분포</h3>'+
+        (Object.keys(stByStatus).length?Object.keys(stByStatus).sort(function(a,b){return stByStatus[b]-stByStatus[a];}).map(function(k){
+          const pct=S.length?Math.round(stByStatus[k]/S.length*100):0;
+          return '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px;"><span class="status '+(STCLASS[k]||"")+'" style="font-size:11px;">'+esc(k)+'</span><b>'+stByStatus[k]+'건 ('+pct+'%)</b></div>';
+        }).join(""):'<p class="mini-note">데이터가 없습니다.</p>')+'</div>'+
+      '</div>'+
+      '<div class="panel" style="margin-top:16px;"><h3>AI 사용 상위 회원</h3><table class="admin-table"><thead><tr><th>이메일</th><th>회사</th><th>AI 호출</th><th>로그인</th><th>스크랩</th><th>최근 접속</th></tr></thead><tbody>'+
+      sorted.map(function(p){ return '<tr><td>'+esc(p.email||String(p.id).slice(0,8))+'</td><td>'+esc(p.company||"-")+'</td><td><b>'+(p.ai_calls||0)+'</b></td><td>'+(p.logins||0)+'</td><td>'+(scByUser[p.id]||0)+'</td><td>'+admDate(p.last_login)+'</td></tr>'; }).join("")+
+      '</tbody></table></div>';
+  }
+  else if(ADM.tab==="users"){
+    const q=(document.getElementById("adm-q")||{}).value||"";
+    let list=P.slice().sort(function(a,b){return String(b.created_at||"").localeCompare(String(a.created_at||""));});
+    if(q) list=list.filter(function(p){ return (String(p.email||"")+String(p.company||"")+String(p.industry||"")).toLowerCase().indexOf(q.toLowerCase())>=0; });
+    body.innerHTML=
+      '<div class="panel" style="margin-bottom:14px;"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'+
+      '<input type="text" id="adm-q" placeholder="이메일·회사명·업종 검색" value="'+esc(q)+'" style="flex:1;min-width:220px;" oninput="renderAdminTab()">'+
+      '<button class="btn" onclick="admExport()">CSV 내보내기</button>'+
+      '<span style="font-size:12.5px;color:var(--ink-soft);">'+list.length+'명</span></div></div>'+
+      '<div class="panel" style="overflow-x:auto;"><table class="admin-table"><thead><tr><th>이메일</th><th>회사</th><th>업종</th><th>지역</th><th>설립</th><th>가입일</th><th>최근접속</th><th>로그인</th><th>AI</th><th>뱅크</th><th>계획서</th><th>스크랩</th><th>지원</th><th>상세</th></tr></thead><tbody>'+
+      list.map(function(p){
+        const e2=ex(p); const b=e2.bank||{};
+        const bn=Object.keys(b).filter(function(k){return String(b[k]||"").length>=20;}).length;
+        const inact=admDaysAgo(p.last_login);
+        return '<tr'+(inact>30?' style="opacity:.55;"':'')+'><td>'+esc(p.email||String(p.id).slice(0,8))+'</td><td>'+esc(p.company||"-")+'</td><td>'+esc(p.industry||"-")+'</td><td>'+esc(p.region||"-")+'</td><td>'+esc(p.founded||"-")+'</td><td>'+admDate(p.created_at)+'</td><td>'+admDate(p.last_login)+'</td><td>'+(p.logins||0)+'</td><td>'+(p.ai_calls||0)+'</td><td>'+bn+'</td><td>'+Object.keys(e2.plans||{}).length+'</td><td>'+(scByUser[p.id]||0)+'</td><td>'+(subByUser[p.id]||0)+'</td>'+
+          '<td><button class="btn" style="font-size:11px;padding:3px 8px;" onclick="admUser(\''+p.id+'\')">보기</button></td></tr>';
+      }).join("")+'</tbody></table></div>';
+  }
+  else if(ADM.tab==="usage"){
+    const byDay={};
+    P.forEach(function(p){ const d=admDate(p.created_at); if(d!=="-") byDay[d]=(byDay[d]||0)+1; });
+    const days=Object.keys(byDay).sort().slice(-14);
+    const maxV=Math.max.apply(null,days.map(function(d){return byDay[d];}).concat([1]));
+    const heavy=P.filter(function(p){return (p.ai_calls||0)>=50;}).length;
+    const zero=P.filter(function(p){return !(p.ai_calls||0);}).length;
+    const estCost=Math.round(totAi*180);
+    body.innerHTML=
+      '<div class="head-stats" style="flex-wrap:wrap;margin-bottom:16px;">'+
+        admStat(totAi,"누적 AI 호출")+
+        admStat(heavy,"헤비 유저","50회 이상")+
+        admStat(zero,"미사용 회원","AI 0회")+
+        admStat("₩"+estCost.toLocaleString(),"예상 AI 비용","호출당 180원 가정")+
+      '</div>'+
+      '<div class="panel" style="margin-bottom:16px;"><h3>최근 가입 추이 (14일)</h3>'+
+      (days.length?'<div style="display:flex;align-items:flex-end;gap:6px;height:130px;margin-top:14px;">'+days.map(function(d){
+        const h=Math.round(byDay[d]/maxV*100);
+        return '<div style="flex:1;text-align:center;"><div style="background:var(--seal);border-radius:4px 4px 0 0;height:'+h+'px;min-height:3px;"></div><div style="font-size:9.5px;color:var(--ink-faint);margin-top:4px;">'+d.slice(5)+'</div><div style="font-size:10px;font-weight:700;">'+byDay[d]+'</div></div>';
+      }).join("")+'</div>':'<p class="mini-note">데이터가 없습니다.</p>')+'</div>'+
+      '<div class="panel"><h3>이탈 위험 회원 (30일 이상 미접속)</h3><table class="admin-table"><thead><tr><th>이메일</th><th>회사</th><th>최근 접속</th><th>미접속</th><th>AI 사용</th></tr></thead><tbody>'+
+      P.filter(function(p){return admDaysAgo(p.last_login)>30;}).sort(function(a,b){return admDaysAgo(b.last_login)-admDaysAgo(a.last_login);}).slice(0,20).map(function(p){
+        return '<tr><td>'+esc(p.email||"-")+'</td><td>'+esc(p.company||"-")+'</td><td>'+admDate(p.last_login)+'</td><td><b style="color:var(--seal);">'+(admDaysAgo(p.last_login)===9999?"기록 없음":admDaysAgo(p.last_login)+"일")+'</b></td><td>'+(p.ai_calls||0)+'</td></tr>';
+      }).join("")+'</tbody></table></div>';
+  }
+  else if(ADM.tab==="content"){
+    const allPlans=[];
+    P.forEach(function(p){ const pl=ex(p).plans||{}; Object.keys(pl).forEach(function(k){ allPlans.push({email:p.email,company:p.company,p:pl[k]}); }); });
+    const annCount={};
+    S.forEach(function(r){ const t=String(r.title||"").slice(0,40); annCount[t]=(annCount[t]||0)+1; });
+    const topAnn=Object.keys(annCount).sort(function(a,b){return annCount[b]-annCount[a];}).slice(0,12);
+    body.innerHTML=
+      '<div class="head-stats" style="flex-wrap:wrap;margin-bottom:16px;">'+
+        admStat(totPlans,"사업계획서")+admStat(totDocs,"학습 문서")+admStat(withRoad,"로드맵 생성")+admStat(ADM.orgs.length,"팀(회사)")+
+      '</div>'+
+      '<div class="content-grid" style="align-items:start;">'+
+      '<div class="panel"><h3>인기 공고 (스크랩 기준)</h3>'+
+      (topAnn.length?topAnn.map(function(t){
+        return '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px;"><span style="flex:1;">'+esc(t)+'</span><b>'+annCount[t]+'명</b></div>';
+      }).join(""):'<p class="mini-note">데이터가 없습니다.</p>')+'</div>'+
+      '<div class="panel"><h3>사업계획서 작성 현황</h3>'+
+      (allPlans.length?allPlans.slice(0,15).map(function(x){
+        const done=(x.p.sections||[]).filter(function(s){return s.text;}).length, tot=(x.p.sections||[]).length;
+        return '<div style="padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px;"><b>'+esc(x.company||x.email||"-")+'</b><div style="color:var(--ink-soft);margin-top:2px;">'+esc(String(x.p.title||"").slice(0,44))+'</div><div style="color:var(--ink-faint);font-size:11px;margin-top:2px;">'+done+'/'+tot+' 작성'+(x.p.score?(" · 검수 "+x.p.score+"점"):"")+'</div></div>';
+      }).join(""):'<p class="mini-note">작성된 사업계획서가 없습니다.</p>')+'</div></div>'+
+      (ADM.logs.length?('<div class="panel" style="margin-top:16px;"><h3>팀 활동 로그 (최근)</h3>'+ADM.logs.slice(0,25).map(function(l){
+        return '<div style="padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:12px;"><b>'+esc(String(l.actor_email||"").split("@")[0])+'</b> · '+esc(l.target_name||"")+' — '+esc(String(l.summary||"").slice(0,60))+' <span style="color:var(--ink-faint);">'+admDate(l.created_at)+'</span></div>';
+      }).join("")+'</div>'):"");
+  }
+  else if(ADM.tab==="system"){
+    body.innerHTML=
+      '<div class="panel" style="margin-bottom:14px;"><h3>공고 수집 상태</h3><div id="adm-sys">'+
+      '<button class="btn btn-seal" onclick="admCheckApi()">지금 점검 실행</button>'+
+      '<p class="mini-note" style="margin-top:8px;">4개 공공 API의 수집 건수와 오류를 확인합니다.</p></div></div>'+
+      '<div class="panel" style="margin-bottom:14px;"><h3>현재 세션 정보</h3>'+
+      '<table class="admin-table"><tbody>'+
+      [["로그인 계정",userEmail||"-"],["공고 출처",srcLabel()],["수집 공고 수",ANNS.length+"건"],["AI 모델",(PROFILE.extra&&PROFILE.extra.model)||"gpt-5.6-terra"],["소속 팀",ORG?ORG.name:"없음"]].map(function(r){
+        return '<tr><td style="width:150px;color:var(--ink-soft);">'+r[0]+'</td><td><b>'+esc(String(r[1]))+'</b></td></tr>';
+      }).join("")+'</tbody></table></div>'+
+      '<div class="panel"><h3>운영 점검 항목</h3><ul style="padding-left:18px;display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--ink-soft);line-height:1.6;">'+
+      '<li>환경변수 변경 후에는 반드시 Vercel에서 Redeploy를 해야 반영됩니다.</li>'+
+      '<li>공고 수집은 20분 캐시입니다. 즉시 확인하려면 주소 뒤에 <b>/api/announcements?fresh=1</b>을 붙이세요.</li>'+
+      '<li>AI 비용은 호출당 100~300원 수준입니다. 헤비 유저는 이용 현황 탭에서 확인하세요.</li>'+
+      '<li>Supabase 저장소(apply-docs)는 무료 1GB입니다. 사용량을 주기적으로 확인하세요.</li>'+
+      '</ul></div>';
+  }
+}
+async function admCheckApi(){
+  const el=document.getElementById("adm-sys");
+  el.innerHTML='<span class="spinner dark"></span> 4개 API 점검 중…';
+  try{
+    const r=await fetch("/api/announcements?fresh=1");
+    const d=await r.json();
+    const rows=[["K-Startup",d.kstartup_count,""],["중소벤처24",d.smes24_count,d.smes24_note],["기업마당",d.bizinfo_count,d.bizinfo_note],["과기부 R&D",d.msit_count,d.msit_note]];
+    el.innerHTML='<table class="admin-table"><thead><tr><th>소스</th><th>수집</th><th>상태</th></tr></thead><tbody>'+
+      rows.map(function(x){
+        const ok=(x[1]||0)>0;
+        return '<tr><td>'+x[0]+'</td><td><b>'+(x[1]||0)+'건</b></td><td>'+(ok?'<span style="color:#1a7f37;font-weight:700;">정상</span>':'<span style="color:var(--seal);font-weight:700;">확인 필요</span> <span style="font-size:11px;color:var(--ink-faint);">'+esc(String(x[2]||"").slice(0,60))+'</span>')+'</td></tr>';
+      }).join("")+'</tbody></table>'+
+      '<p class="mini-note" style="margin-top:8px;">총 '+(d.count||0)+'건 · 출처: '+esc(d.source||"-")+'</p>'+
+      '<button class="btn" style="margin-top:10px;" onclick="admCheckApi()">다시 점검</button>';
+  }catch(e){ el.innerHTML='<div class="err-box">점검 실패: '+esc(String(e.message||e))+'</div>'; }
+}
+function admUser(id){
+  const p=ADM.profiles.find(function(x){return x.id===id;}); if(!p) return;
+  const e2=(p.extra&&typeof p.extra==="object")?p.extra:{};
+  const b=e2.bank||{};
+  const bn=Object.keys(b).filter(function(k){return String(b[k]||"").length>=20;});
+  const myS=ADM.scraps.filter(function(r){return r.user_id===id;});
+  document.getElementById("guide-title").textContent=(p.company||p.email||"회원")+" 상세";
+  document.getElementById("guide-body").innerHTML=
+    '<div class="sec-title">기본 정보</div><table class="admin-table" style="margin-bottom:14px;"><tbody>'+
+    [["이메일",p.email],["회사",p.company],["업종",p.industry],["설립",p.founded],["지역",p.region],["직원",p.staff],["매출",p.revenue],["가입일",admDate(p.created_at)],["최근 접속",admDate(p.last_login)],["로그인",p.logins||0],["AI 호출",p.ai_calls||0]].map(function(r){
+      return '<tr><td style="width:110px;color:var(--ink-soft);">'+r[0]+'</td><td>'+esc(String(r[1]||"-"))+'</td></tr>';
+    }).join("")+'</tbody></table>'+
+    '<div class="sec-title">활용 현황</div><p style="font-size:13px;color:var(--ink-soft);line-height:1.8;">데이터뱅크 '+bn.length+'개 항목 · 사업계획서 '+Object.keys(e2.plans||{}).length+'건 · 학습 문서 '+((e2.docs||[]).length)+'건 · 로드맵 '+(e2.roadmap?"생성됨":"없음")+'</p>'+
+    '<div class="sec-title">사업 소개</div><p style="font-size:13px;color:var(--ink-soft);line-height:1.75;">'+esc(String(p.descr||"-").slice(0,600))+'</p>'+
+    '<div class="sec-title">스크랩·지원 ('+myS.length+'건)</div>'+
+    (myS.length?myS.slice(0,20).map(function(r){
+      return '<div style="padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px;"><span class="status '+(STCLASS[r.status]||"")+'" style="font-size:10.5px;">'+esc(r.status||"")+'</span> '+esc(String(r.title||"").slice(0,46))+'</div>';
+    }).join(""):'<p class="mini-note">없음</p>');
+  document.getElementById("draft-btn").classList.add("hidden");
+  document.getElementById("guide-drawer").classList.add("open");
+  document.getElementById("overlay").classList.add("open");
+}
+function admExport(){
+  const rows=[["이메일","회사","업종","지역","설립","가입일","최근접속","로그인수","AI호출","스크랩"]];
+  const scByUser={};
+  ADM.scraps.forEach(function(r){ scByUser[r.user_id]=(scByUser[r.user_id]||0)+1; });
+  ADM.profiles.forEach(function(p){
+    rows.push([p.email||"",p.company||"",p.industry||"",p.region||"",p.founded||"",admDate(p.created_at),admDate(p.last_login),p.logins||0,p.ai_calls||0,scByUser[p.id]||0]);
+  });
+  const csv=rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(",");}).join("\n");
+  const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="공고비서_회원_"+new Date().toISOString().slice(0,10)+".csv";
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
+/* ══ 지원 관리
 /* ══ 지원 관리 (제출 서류·발표·선정) ══ */
 let applyKey=null, applyIdx=null;
 function scrapOf(key){ if(!scraps[key]) scraps[key]={status:"검토 중",detail:{}}; if(!scraps[key].detail) scraps[key].detail={}; return scraps[key]; }
@@ -2395,7 +2664,7 @@ async function genOneStage(k){
   const body=document.getElementById("roadmap-body");
   body.innerHTML='<div style="padding:26px 0;text-align:center;color:var(--ink-soft);"><span class="spinner dark"></span> '+esc(st.n)+' 구간을 설계하는 중입니다…</div>';
   try{
-    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n"+bankContext()+"\n\n"+RM_PERSONA+"\n\n[이번에 작성할 구간] "+st.n+"\n"+st.inst+"\n\n2000자 이상으로 매우 상세하게. 표와 [그림: 제목] 블록을 활용해 구조를 시각화해라. 이 구간 내용만 출력."}],7500);
+    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n"+bankContext()+"\n\n"+RM_PERSONA+"\n\n[이번에 작성할 구간] "+st.n+"\n"+st.inst+"\n\n2000자 이상으로 매우 상세하게. 표와 [그림: 제목] 블록을 활용해 구조를 시각화해라.\n[그림] 문법: 단순 흐름은 'A -> B -> C', 영역별 구조는 첫 줄 '@열: 영역1 | 영역2 | 영역3' 후 각 행을 '내용1 | 내용2 | 내용3'으로 작성(열 헤더·번호·화살표 자동 생성).\n이 구간 내용만 출력."}],7500);
     PROFILE.extra.roadmap=PROFILE.extra.roadmap||{stages:{}};
     PROFILE.extra.roadmap.stages=PROFILE.extra.roadmap.stages||{};
     PROFILE.extra.roadmap.stages[k]=raw;
@@ -2421,7 +2690,7 @@ async function genRoadmap(force){
     btn.innerHTML='<span class="spinner"></span> '+(i+1)+'/'+RM_STAGES.length+' — '+st.n+' 분석 중…';
     body.innerHTML='<div style="padding:20px 0;text-align:center;color:var(--ink-soft);"><span class="spinner dark"></span> '+esc(st.n)+' 구간을 설계하고 있습니다…<br><span style="font-size:12px;color:var(--ink-faint);">6개 구간을 각각 깊이 있게 작성하므로 2~3분 걸립니다.</span></div>';
     try{
-      const raw=await callClaude([{role:"user",content:ctx+"\n\n"+persona+"\n\n[이번에 작성할 구간] "+st.n+"\n"+st.inst+"\n\n2000자 이상으로 매우 상세하게. 표와 [그림: 제목] 블록을 활용해 구조를 시각화해라. 이 구간 내용만 출력."}],7500);
+      const raw=await callClaude([{role:"user",content:ctx+"\n\n"+persona+"\n\n[이번에 작성할 구간] "+st.n+"\n"+st.inst+"\n\n2000자 이상으로 매우 상세하게. 표와 [그림: 제목] 블록을 활용해 구조를 시각화해라.\n[그림] 문법: 단순 흐름은 'A -> B -> C', 영역별 구조는 첫 줄 '@열: 영역1 | 영역2 | 영역3' 후 각 행을 '내용1 | 내용2 | 내용3'으로 작성(열 헤더·번호·화살표 자동 생성).\n이 구간 내용만 출력."}],7500);
       stages[st.k]=raw;
       PROFILE.extra.roadmap={stages:stages,at:fmtDate(new Date()),sel:RM_STAGES[0].k,stale:false};
       await saveProfileRemote();
@@ -2788,12 +3057,22 @@ function renderBank(){
         (sb&&userId?'<input type="file" id="bkfile-'+f.k+'" class="hidden" multiple onchange="bankUpload(\''+f.k+'\',this)"><button class="btn" style="font-size:11.5px;padding:4px 10px;" onclick="document.getElementById(\'bkfile-'+f.k+'\').click()">+ 근거 자료 첨부 (여러 개 가능)</button>':'<span class="mini-note" style="margin:0;">첨부는 로그인 후 가능</span>')+
         '<button class="btn" style="font-size:11.5px;padding:4px 10px;" onclick="bankExpand(\''+f.k+'\')">AI로 다듬기</button>'+
         noteBadge("bank."+f.k)+
+        (v.trim().length>200?'<button class="btn" style="font-size:11.5px;padding:4px 10px;" onclick="bankPreview(\''+f.k+'\')">👁 미리보기</button>':'')+
         '<span id="bkmsg-'+f.k+'" style="font-size:11.5px;color:var(--ink-soft);"></span></div>'+
         '<div id="bkf-'+f.k+'" style="margin-top:6px;"></div></div>';
     }).join("")+'</div>';
   }).join("");
   BANK_FIELDS.forEach(function(f){ const el=document.getElementById("bk-"+f.k); if(el) el.value=b[f.k]||""; });
   renderBankFiles();
+}
+function bankPreview(k){
+  const f=BANK_FIELDS.find(function(x){return x.k===k;});
+  const v=(document.getElementById("bk-"+k)||{}).value||bank()[k]||"";
+  document.getElementById("guide-title").textContent=f.n;
+  document.getElementById("guide-body").innerHTML=mdRich(v.replace(/^■ /gm,"## "));
+  document.getElementById("draft-btn").classList.add("hidden");
+  document.getElementById("guide-drawer").classList.add("open");
+  document.getElementById("overlay").classList.add("open");
 }
 async function bankExpand(k){
   const f=BANK_FIELDS.find(function(x){return x.k===k;});
@@ -2803,11 +3082,24 @@ async function bankExpand(k){
   msg.innerHTML='<span class="spinner dark"></span> 상세하게 작성 중… (30초 정도)';
   try{
     const others=BANK_FIELDS.filter(function(x){return x.k!==k;}).map(function(x){var v=(bank()[x.k]||"").trim(); return v?("["+x.n+"] "+v.slice(0,300)):"";}).filter(Boolean).join("\n");
+    const DEEP={
+      problem:"문제의 규모를 수치로, 현재 해결책의 한계, 방치 시 손실, 시장이 이 문제를 인식하는 정도까지",
+      solution:"기술 원리를 단계별로, 핵심 알고리즘·구조, 왜 이 방식이 유효한지, 기술적 난이도와 진입장벽",
+      diff:"경쟁사별 비교표(항목/우리/경쟁사A/경쟁사B), 정량 우위, 모방 난이도, 지속 가능한 해자",
+      market:"TAM·SAM·SOM 각각의 산출 논리와 근거, 성장률, 세분 시장별 규모, 진입 우선순위",
+      bm:"과금 구조 상세, 가격 티어별 구성, 원가 구조, 고객 획득비·생애가치, 손익분기 조건",
+      team:"각 인력의 전공·경력·담당 역할, 팀 구성의 강점, 부족한 역할과 충원 계획",
+      plan:"분기별 마일스톤 표(시기/목표/산출물/검증지표), 각 단계의 리스크",
+      fund:"비목별 배분표(인건비/재료비/외주비/장비), 각 항목의 산출 근거와 단가",
+      perf:"연도별 매출표, 고객 유형별 구성, 수주 파이프라인, 성장률",
+      risk:"리스크 유형별 표(리스크/발생가능성/영향도/대응방안/책임자)"
+    };
     const raw=await callClaude([{role:"user",content:profileContext()+
       "\n\n[다른 항목에 이미 적힌 내용 — 일관성 유지에 참고]\n"+others.slice(0,4000)+
+      (DEEP[k]?("\n\n[이 항목에서 반드시 다룰 것]\n"+DEEP[k]):"")+
       "\n\n[작성할 항목] "+f.n+"\n[작성 예시] "+f.ph+
       "\n[대표가 입력한 핵심 내용]\n"+cur+
-      "\n\n너는 정부지원사업 사업계획서 전문 컨설턴트다. 위 핵심 내용을 바탕으로 이 항목을 사업계획서·정책자금·투자 IR에 그대로 쓸 수 있는 수준으로 아주 상세하게 작성해라.\n\n규칙:\n1. 입력에 없는 구체적 수치·고객사명·특허번호는 절대 지어내지 말 것. 필요하면 [보완 필요: 무엇]으로 표시\n2. 다만 업계 일반 지식·논리 전개·구조화·표현 보강은 적극적으로 해도 된다\n3. 개조식(ㅇ, -)과 ■ 소제목으로 구조화하고, 비교·일정·구성은 마크다운 표로\n4. 2000자 이상으로 충분히 깊게. 심사위원이 읽고 이해·평가할 수 있을 만큼\n5. 한국어. 본문만 출력"}],7500);
+      "\n\n너는 정부지원사업 사업계획서 전문 컨설턴트다. 위 핵심 내용을 바탕으로 이 항목을 사업계획서·정책자금·투자 IR에 그대로 쓸 수 있는 수준으로 아주 상세하게 작성해라.\n\n규칙:\n1. 입력에 없는 구체적 수치·고객사명·특허번호는 절대 지어내지 말 것. 필요하면 [보완 필요: 무엇]으로 표시\n2. 다만 업계 일반 지식·논리 전개·구조화·표현 보강은 적극적으로 해도 된다\n3. 개조식(ㅇ, -)과 ■ 소제목으로 구조화하고, 비교·일정·구성은 마크다운 표로\n4. 표를 최소 1개 포함하고, 구조·흐름은 [그림: 제목] ... [/그림] 블록으로 그려라.\n   - 단순 흐름: A -> B -> C\n   - 영역별 단계 구조(권장): 첫 줄에 '@열: 영역1 | 영역2 | 영역3', 이후 각 행을 '내용1 | 내용2 | 내용3' 으로. 열 헤더와 행 번호, 화살표가 자동 생성된다\n5. 2000자 이상으로 충분히 깊게. 심사위원이 읽고 바로 평가할 수 있을 만큼 구체적으로\n6. 한국어. 본문만 출력"}],7500);
     el.value=raw.trim(); await bankSave();
     msg.innerHTML='<b style="color:#1a7f37;">'+raw.trim().length+'자로 작성 완료 ✓</b>';
     renderBank();
@@ -3052,7 +3344,7 @@ function renderPlanEditor(){
         '<div class="panel" style="margin-bottom:12px;">'+
           '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">'+
             '<b style="flex:1;font-size:15px;font-family:var(--serif);">'+esc(s.title)+'</b>'+
-            '<button class="btn btn-seal" onclick="genSection('+curSec+')">'+(s.text?"이 섹션 다시 작성":"이 섹션 작성")+'</button>'+
+            '<button class="btn btn-seal" id="gen-btn" onclick="genSectionUI('+curSec+')">'+(s.text?"이 섹션 다시 작성":"이 섹션 작성")+'</button>'+
             (s.text?'<button class="btn" onclick="tuneSection('+curSec+',\'expand\')">더 길게</button><button class="btn" onclick="tuneSection('+curSec+',\'trim\')">간결하게</button>':'')+
           '</div>'+
           (s.guide?'<p class="mini-note" style="margin:0 0 10px;">작성 지침: '+esc(s.guide)+(s.points?(' · 배점 '+s.points+'점'):'')+'</p>':'')+
@@ -3077,6 +3369,17 @@ function renderPlanEditor(){
   if(p.review) document.getElementById("review-out").innerHTML=p.review;
 }
 let secDirty=false;
+async function genSectionUI(i){
+  const btn=document.getElementById("gen-btn");
+  const pv=document.getElementById("sec-preview");
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 작성 중… (1~2분)'; }
+  if(pv){ pv.innerHTML='<div style="text-align:center;padding:40px 0;color:var(--ink-soft);"><span class="spinner dark"></span><br><br>AI가 이 항목을 작성하고 있습니다.<br><span style="font-size:12px;color:var(--ink-faint);">표와 구조도를 포함해 상세하게 쓰므로 1~2분 걸립니다.</span></div>'; }
+  try{ await genSection(i); }
+  catch(e){
+    if(pv) pv.innerHTML='<div class="err-box">작성에 실패했습니다.<br>'+esc((errDetail(e)||"잠시 후 다시 시도해 주세요").slice(0,120))+'</div>';
+    if(btn){ btn.disabled=false; btn.textContent="다시 시도"; }
+  }
+}
 function renderSecPreview(){
   const t=document.getElementById("sec-text"), p=document.getElementById("sec-preview");
   if(!t||!p) return;
@@ -3182,7 +3485,9 @@ function planPrompt(p,s,shorter){
     "3. ■ 소제목으로 단락을 나누고 각 소제목 아래 개조식 항목 3~6개\n"+
     "4. 표를 적극 활용 — 비교·일정·예산·목표 지표·경쟁사 분석·성과지표는 반드시 마크다운 표로 (| 구분 | 내용 | 형식). 최소 1개 이상\n"+
     "5. 시각 자료를 반드시 포함 — 구조·흐름·관계는 아래 형식으로 직접 그려라. 실제 그림으로 렌더링된다:\n"+
-    "   [그림: 시스템 구성도]\n   엣지 에이전트 -> 중앙관리 서버 -> 관리 콘솔\n   중앙관리 서버 -> 스냅샷 저장소\n   [/그림]\n"+
+    "   ① 단순 흐름은 화살표로:\n   [그림: 데이터 처리 흐름]\n   수집 -> 정규화 -> 분석 -> 대응\n   [/그림]\n"+
+    "   ② 여러 영역이 단계별로 상호작용하는 구조는 '열(레인)' 문법으로 (가장 권장):\n   [그림: 시스템 구성도]\n   @열: 수집 영역 | 분석·판단 영역 | 대응·복구 영역\n   1) Linux 서버 | X-EDR Agent | Pre-write 스냅샷 생성\n   2) 이벤트 수집 | 위협 판정 | 자동 격리\n   3) 자산 정보 연계 | 정책 결정 | 파일 롤백\n   [/그림]\n   → 열 제목은 @열:로, 각 행은 파이프(|)로 구분하면 열 헤더·행 번호·화살표가 자동으로 그려진다\n"+
+    "   ③ 순환 구조는 제목에 '선순환' 또는 '순환'을 포함하면 되돌아오는 화살표가 그려진다\n   ※ 단순 나열 금지 — 반드시 관계가 드러나게 작성\n"+
     "   추진 절차·개발 단계·조직 구성 등도 같은 방식으로. 항목당 최소 1개\n"+
     "6. 심사위원이 배점을 줄 수 있게 정량 근거 중심 — 왜 이 수치인지 산출 근거까지\n"+
     "7. 분량 제한 없음. "+(shorter?"1500":String(s.len))+"자 이상으로, 심사위원을 설득하는 데 필요한 만큼 충분히 깊게 작성해라. 짧게 쓰지 마라\n"+
