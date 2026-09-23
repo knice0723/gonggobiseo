@@ -299,7 +299,7 @@ module.exports = async (req, res) => {
 
   const fresh = req.url && req.url.indexOf("fresh=1") >= 0;
   const lmm = req.url && req.url.match(/limit=(\d+)/);
-  const lim = lmm ? Math.max(10, Math.min(800, parseInt(lmm[1], 10))) : 0;
+  const lim = lmm ? Math.max(10, Math.min(1500, parseInt(lmm[1], 10))) : 0;
   if (!fresh && cache.payload && Date.now() - cache.at < 3 * 60 * 60 * 1000) {
     const p = cache.payload;
     return res.status(200).json(lim ? Object.assign({}, p, { items: p.items.slice(0, lim), limited: lim }) : p);
@@ -334,7 +334,7 @@ module.exports = async (req, res) => {
   }
   let items = [...map.values()];
   items.sort((a, b) => String(b.registered).localeCompare(String(a.registered)));
-  if (items.length > 800) items = items.slice(0, 800);
+  if (items.length > 1500) items = items.slice(0, 1500);
 
   if (!items.length) {
     return res.status(200).json({ source: "seed", reason: "all_failed", smes24_note: smRes.note || "", bizinfo_note: bzRes.note || "", items: [] });
