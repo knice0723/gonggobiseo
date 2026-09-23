@@ -143,6 +143,7 @@ textarea{padding:13px 15px;line-height:1.7;}
 .plan-card.hot{border-color:var(--seal);box-shadow:0 4px 20px rgba(178,34,34,.09);}
 .plan-price{font-family:var(--serif);font-size:26px;font-weight:800;color:var(--ink);margin:6px 0 2px;}
 @media(max-width:900px){.wr-wrap{grid-template-columns:1fr;}.wr-toc{position:static;}}
+.just-viewed{outline:2px solid var(--navy);outline-offset:3px;border-radius:var(--radius);}
 .skel{height:120px;border-radius:var(--radius);background:linear-gradient(90deg,var(--card) 25%,var(--paper) 50%,var(--card) 75%);background-size:400% 100%;animation:skel 1.3s infinite;border:1px solid var(--line);margin-bottom:14px;}
 @keyframes skel{0%{background-position:100% 0}100%{background-position:0 0}}
 
@@ -1578,6 +1579,28 @@ function go(v, fromPop){
   if(v==="bank") renderBank();
   if(v==="writer") renderWriter();
   if(!fromPop) pushNav({v:v});
+  restoreListPosition(v);
+}
+/* ══ 목록으로 돌아올 때 방금 본 공고를 화면 맨 위에 ══ */
+let LIST_RETURN=null;
+function backToList(){
+  const v=(LIST_RETURN&&LIST_RETURN.view&&LIST_RETURN.view!=="detail")?LIST_RETURN.view:"dashboard";
+  go(v);
+}
+function restoreListPosition(v){
+  const r=LIST_RETURN;
+  if(!r||r.view!==v) return;
+  LIST_RETURN=null;
+  const view=document.getElementById("view-"+v); if(!view) return;
+  const idx=ANNS.findIndex(function(a){return a.key===r.key;});
+  const btn=idx>=0?view.querySelector('[onclick^="openDetail('+idx+')"]'):null;
+  const row=btn?(btn.closest(".ann-row,.card")||btn.parentElement):null;
+  setTimeout(function(){ // 목록을 다 그린 다음에 이동
+    if(!row){ window.scrollTo(0,r.y||0); return; }   // 목록에 없으면(필터·200건 밖) 보던 위치로
+    window.scrollTo(0,Math.max(0,row.getBoundingClientRect().top+window.scrollY-16));
+    row.classList.add("just-viewed");
+    setTimeout(function(){ row.classList.remove("just-viewed"); },2200);
+  },0);
 }
 function enterApp(){
   document.getElementById("top-user").textContent = userEmail ? userEmail : "체험 모드";
@@ -1750,9 +1773,11 @@ function checklistFor(a){
 }
 function openDetail(idx, fromPop){
   const a=ANNS[idx]; const scrapped=scraps[a.key]!==undefined;
+  if(currentView!=="detail") LIST_RETURN={view:currentView,key:a.key,y:window.scrollY};
+  else if(LIST_RETURN) LIST_RETURN.key=a.key; // 상세 안에서 '비슷한 공고'로 옮겨가면 마지막에 본 공고로
   const similar=ANNS.filter(x=>x!==a&&x.field===a.field).slice(0,2);
   document.getElementById("view-detail").innerHTML =
-    '<button class="back-link" onclick="go(\'dashboard\')">← 목록으로</button>'+
+    '<button class="back-link" onclick="backToList()">← 목록으로</button>'+
     '<div class="detail-top"><div style="flex:1;">'+
     '<div class="card-eyebrow"><span class="src">'+esc(a.source)+'</span><span class="dot"></span><span>'+esc(a.field)+'</span>'+(a.isNew?'<span class="badge-new">오늘 신규</span>':"")+(a.dual?'<span class="badge-dual">복수 채널 동시 게재</span>':"")+'</div>'+
     '<h1 class="detail-title">'+esc(a.title)+'</h1></div>'+
