@@ -471,6 +471,10 @@ textarea{padding:13px 15px;line-height:1.7;}
           <div class="doc-meta"><span><b>수신</b><span id="greet-name">대표님</span><span id="greet-ws"></span></span><span><b>발신</b>공고비서 데일리 브리핑</span><span><b>시행</b><span id="today-str"></span></span></div>
           <h1 class="doc-title" id="brief-title">공고를 수집하고 있습니다…</h1>
           <p class="doc-sub" id="brief-sub"></p>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;">
+            <button class="btn" id="ann-refresh" onclick="refreshAnnouncements()">↻ 공고 새로 가져오기</button>
+            <span id="ann-at" style="font-size:12px;color:var(--ink-faint);"></span>
+          </div>
         </div>
         <div class="head-stats">
           <div class="stat"><div class="num" id="stat-match">0</div><div class="lbl">맞춤 공고</div></div>
@@ -1115,10 +1119,42 @@ const DOMAINS=[
   {k:"에너지·환경", re:/수소|태양광|풍력|원전|탄소중립|재생에너지|폐기물|자원순환/, prof:/에너지|수소|태양광|환경|탄소|폐기물/},
   {k:"소비재·유통", re:/유아용품|생활용품|화장품|식음료|주방|가구|완구|박람회\s*참가|팝업스토어|백화점\s*입점/, prof:/소비재|생활용품|유통|식음료|커머스|리테일/}
 ];
+/* 프로필 지문 — 매칭에 쓰이는 항목이 바뀌면 값이 달라져 사전·AI 점수를 새로 만든다 */
+function profileSig(){
+  const ex=PROFILE.extra||{}, ld=ex.learned||ex.doc||{};
+  const src=[PROFILE.industry,PROFILE.founded,PROFILE.region,PROFILE.revenue,PROFILE.descr,(PROFILE.keywords||[]).join(","),ex.products,ex.target,ex.needs,ex.certs,ex.corp,ld.summary].join("|");
+  let h=0; for(let i=0;i<src.length;i++){ h=(h*31+src.charCodeAt(i))|0; }
+  return "p"+(h>>>0).toString(36);
+}
+function validDict(){
+  const d=PROFILE.extra&&PROFILE.extra.matchDict;
+  if(!d||d.sig!==profileSig()) return null;
+  return d;
+}
+async function ensureMatchDict(){
+  if(validDict()||!PROFILE.company) return;
+  const clean=function(arr,max){ return [...new Set((Array.isArray(arr)?arr:[]).map(function(w){return String(w).toLowerCase().replace(/^#/,"").trim();}).filter(function(w){return w.length>=2&&w.length<=20;}))].slice(0,max); };
+  const ask=function(){ return callClaude([{role:"user",content:profileContext()+"\n\n위 회사에 맞는 정부지원사업 공고를 찾기 위한 '매칭 사전'을 만들어라. 공고 제목과 요약에 실제로 쓰이는 정부 용어로 적어야 한다 (예: 보안 회사라면 '정보보호' '사이버보안' '개인정보', AI 회사라면 '인공지능' 'AI바우처' '데이터바우처').\n\nJSON만 출력:\n{\"core\":[\"이 회사 사업과 직접 맞닿은 공고 용어 12~20개 — 동의어·약어·정부 표현 포함, 단어 2~8글자\"],\n\"related\":[\"간접적으로 맞는 넓은 용어 10~15개\"],\n\"avoid\":[\"이 회사와 무관해서 제목에 있으면 거의 확실히 부적합한 대상 업종 용어 10~15개 (예: 농업 회사가 아니면 '농업인' '스마트팜')\"],\n\"wants\":[\"이 회사에 지금 가장 필요한 지원 유형 최대 4개 — 자금·바우처·R&D·판로·마케팅·수출·인력·투자유치·인증·클라우드·SaaS·공공조달·교육·멘토링·공간·입주 중에서. 프로필의 '필요한 지원'이 있으면 그것을 따르고 근거가 없으면 빈 배열\"]}\n\n'지원' '사업' '기업' '중소기업' '기술' '개발' 같은 모든 공고에 나오는 일반어는 넣지 마라."}],2000).then(parseJson); };
+  let j; try{ j=await ask(); }catch(e){ j=await ask(); } // 응답이 잘려 오면 한 번 더
+  const dict={sig:profileSig(),core:clean(j.core,24),related:clean(j.related,18),avoid:clean(j.avoid,18),wants:clean(j.wants,4),at:Date.now()};
+  if(!dict.core.length) return;
+  PROFILE.extra=PROFILE.extra||{}; PROFILE.extra.matchDict=dict;
+  await saveProfileRemote();
+  rescoreAll();
+}
+const GENERIC_KW=/^(마케팅|홍보|수출|해외|해외진출|판로|판로개척|영업|인력|채용|고용|투자|투자유치|자금|정책자금|융자|보조금|바우처|b2b|b2c|b2g|it|ict|온라인|오프라인|교육|컨설팅|멘토링|창업|스타트업|벤처|중견|대기업|고객|매출|국내|글로벌|디지털|신사업|제조업|서비스업)$/;
+// 영문 용어는 단어 경계로만 인정 (it 가 summit 에 걸리는 문제), 한글은 포함 여부로
+function hasTerm(text,w){
+  if(/^[a-z0-9&+.-]+$/.test(w)){
+    if(w.length<2) return false;
+    return new RegExp("(^|[^a-z0-9])"+w.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"($|[^a-z0-9])").test(text);
+  }
+  return text.indexOf(w)>=0;
+}
 function scoreAnn(a){
   const title=String(a.title||"");
   const titleLow=title.toLowerCase();
-  const text=(title+" "+(a.summary||"")+" "+(a.field||"")).toLowerCase();
+  const text=(title+" "+(a.summary||"")+" "+(a.field||"")+" "+(a.agency||"")).toLowerCase();
   const ex=PROFILE.extra||{};
   const learned=ex.learned||ex.doc;
   const reasons=[], warns=[];
@@ -1140,11 +1176,20 @@ function scoreAnn(a){
   tokens((ex.needs||"")+" "+(ex.certs||""),2).forEach(function(w){mid.add(w);});
   tokens(PROFILE.descr,3).forEach(function(w){weak.add(w);});
   if(learned) tokens((learned.summary||"")+" "+((learned.strengths||[]).join(" ")),3).forEach(function(w){weak.add(w);});
+  /* AI 매칭 사전 — 동의어·정부 공고 용어까지 확장된 핵심어 (프로필이 바뀌면 다시 만든다) */
+  const dict=validDict();
+  if(dict){
+    dict.core.forEach(function(w){ if(!STOP.has(w)) strong.add(w); });
+    dict.related.forEach(function(w){ if(!STOP.has(w)&&!strong.has(w)) mid.add(w); });
+  }
 
-  const hitS=[...strong].filter(function(w){return text.indexOf(w)>=0;});
-  const hitM=[...mid].filter(function(w){return !strong.has(w)&&text.indexOf(w)>=0;});
-  const hitW=[...weak].filter(function(w){return !strong.has(w)&&!mid.has(w)&&text.indexOf(w)>=0;});
-  const titleHits=hitS.filter(function(w){return titleLow.indexOf(w)>=0;});
+  // 지원 유형·일반어(마케팅·수출·b2b 등)는 '우리 사업과 같은 분야'의 근거가 아니다 → 핵심어에서 빼고 5)에서 따로 본다
+  [...strong].forEach(function(w){ if(GENERIC_KW.test(w)){ strong.delete(w); weak.add(w); } });
+  [...mid].forEach(function(w){ if(GENERIC_KW.test(w)){ mid.delete(w); weak.add(w); } });
+  const hitS=[...strong].filter(function(w){return hasTerm(text,w);});
+  const hitM=[...mid].filter(function(w){return !strong.has(w)&&hasTerm(text,w);});
+  const hitW=[...weak].filter(function(w){return !strong.has(w)&&!mid.has(w)&&hasTerm(text,w);});
+  const titleHits=hitS.filter(function(w){return hasTerm(titleLow,w);});
 
   s += Math.min(hitS.length*9,27);
   s += Math.min(titleHits.length*7,14);   // 제목에 등장 = 강한 신호
@@ -1162,6 +1207,11 @@ function scoreAnn(a){
     if(d.prof.test(coreTxt)){ s+=10; reasons.push(d.k+" 영역 부합"); }
     else { s-=32; domainMismatch=true; warns.push(d.k+" 대상 공고 — 우리 업종 아님"); }
   });
+
+  if(dict&&!domainMismatch){
+    const av=dict.avoid.filter(function(w){return hasTerm(titleLow,w);});
+    if(av.length&&!titleHits.length){ s-=24; domainMismatch=true; warns.push("우리와 무관한 분야("+av[0]+")"); }
+  }
 
   /* 3) 지역 */
   const reg=String(PROFILE.region||"").slice(0,2);
@@ -1191,7 +1241,7 @@ function scoreAnn(a){
   if(revLim){ const rv=parseFloat(String(PROFILE.revenue||"").replace(/[^0-9.]/g,""))||0; if(rv<parseFloat(revLim[1])){ s-=28; warns.push("매출 "+revLim[1]+"억 이상 대상"); } }
 
   /* 5) 필요 지원 유형 — 여러 개 맞아도 한 번만 가산 (중첩 방지) */
-  const needTxt=(ex.needs||"").toLowerCase();
+  const needTxt=((ex.needs||"")+" "+(dict?dict.wants.join(" "):"")).toLowerCase();
   const TYPES=[
     {re:/사업화\s*자금|보조금|출연금|융자|정책자금/, need:/자금|사업화|보조금|융자/, label:"자금"},
     {re:/바우처/, need:/바우처|컨설팅|디자인/, label:"바우처"},
@@ -1216,6 +1266,9 @@ function scoreAnn(a){
     if(/교육|멘토링|인력양성/.test(needTxt)) s-=6;
     else { s-=28; warns.push("교육·행사성 공고"); }
   }
+
+  /* 6.2) 신청 공고가 아닌 것 — 선정 결과·합격자 발표·취소 공고 */
+  if(/선정\s*결과|결과\s*(공고|발표|안내)|합격자|최종\s*선정\s*(기업|명단)|심사\s*결과|선정\s*기업\s*발표|공고\s*취소|사업\s*취소/.test(title)){ s-=45; warns.push("결과 발표·취소 공고 — 신청 대상 아님"); }
 
   /* 6.5) 구조적 제약 감지 — 컨소시엄·지정품목·과제 공고는 원문 확인 전 고득점 금지 */
   if(/컨소시엄|수요기업.{0,14}공급기업|공동\s*(신청|수행)|주관기관.{0,10}참여기관/.test(text)){ s-=10; warns.push("컨소시엄(공동 신청) 구성 필요"); }
@@ -1280,7 +1333,13 @@ function refreshViewsAfterData(){
   if(currentView==="calendar")renderCal();
   if(currentView==="bookmark")renderBookmarks();
   if(currentView==="scrap")renderScrap();
-  if(userId&&ANNS.length&&annSource!=="seed"){ genInsight(false); aiRerank(); }
+  maybeRunAi();
+}
+/* AI 작업(매칭 사전 · 요건 검증 · 데일리 리포트)은 회사 정보와 전체 공고가 모두 준비된 뒤 한 번만 */
+let ANN_FULL=false, USER_READY=false;
+function maybeRunAi(){
+  if(!userId||!USER_READY||!ANN_FULL||!ANNS.length||annSource==="seed"||!PROFILE.company) return;
+  aiRerank().then(function(){ genInsight(false); }); // 순서대로 — 동시에 저장하다 한쪽이 묻히지 않게
 }
 function applyAnnItems(items){
   ANNS = items.map(normalize);
@@ -1295,23 +1354,68 @@ function applyAnnItems(items){
   document.getElementById("side-src").textContent = (annSource==="seed") ? "예시 공고 표시 중" : srcLabel()+" 실시간 연동 · "+ANNS.length+"건";
   applyAiCache();
 }
+/* 마지막으로 받은 공고를 이 브라우저에 보관 — 다음 접속 때 기다림 없이 바로 보여준다 */
+let ANN_AT=0;
+function readAnnCache(){
+  try{ const c=JSON.parse(localStorage.getItem("gg_anns")||"null"); if(c&&Array.isArray(c.items)&&c.items.length&&Date.now()-c.at<3*86400000) return c; }catch(e){}
+  return null;
+}
+function writeAnnCache(source,items,at){
+  try{ localStorage.setItem("gg_anns",JSON.stringify({at:at,source:source,items:items})); }catch(e){}
+}
+function useAnnData(d){
+  annSource=d.source||"live";
+  ANN_AT=d.fetched_at?new Date(d.fetched_at).getTime():Date.now();
+  applyAnnItems(d.items);
+}
 async function loadAnnouncements(){
-  let items=[];
+  const c=readAnnCache();
+  if(c){ annSource=c.source; ANN_AT=c.at; applyAnnItems(c.items); ANN_FULL=true; refreshViewsAfterData(); }
+  else{
+    try{
+      const r=await fetch("/api/announcements?limit=120"); // 처음 접속: 최신 120건부터 빠르게
+      if(r.ok){ const d=await r.json(); if(d.items&&d.items.length){ useAnnData(d); refreshViewsAfterData(); } }
+    }catch(e){}
+  }
   try{
-    const r = await fetch("/api/announcements?limit=120"); // 1차: 최신 120건만 빠르게
-    if(r.ok){ const d=await r.json(); if(d.items && d.items.length){ items=d.items; annSource=d.source||"live"; } }
+    const r=await fetch("/api/announcements"); // 전체 목록 (서버에 모아둔 것이라 빠르다)
+    const d=r.ok?await r.json():null;
+    if(d&&d.items&&d.items.length){ useAnnData(d); writeAnnCache(annSource,d.items,ANN_AT); ANN_FULL=true; refreshViewsAfterData(); return; }
   }catch(e){}
-  if(!items.length){ items=SEED; annSource="seed"; }
-  applyAnnItems(items);
-  refreshViewsAfterData();
-  if(annSource!=="seed"){
-    fetch("/api/announcements").then(function(r){return r.json();}).then(function(d){ // 2차: 전체를 백그라운드로
-      if(d && d.items && d.items.length>ANNS.length){
-        annSource=d.source||annSource;
-        applyAnnItems(d.items);
-        refreshViewsAfterData();
-      }
-    }).catch(function(){});
+  if(!ANNS.length){ annSource="seed"; applyAnnItems(SEED); refreshViewsAfterData(); }
+}
+/* 대시보드의 '공고 새로 가져오기' — 기관 사이트에서 지금 바로 다시 수집 */
+let annRefreshing=false;
+async function refreshAnnouncements(){
+  if(annRefreshing) return;
+  annRefreshing=true;
+  const btn=document.getElementById("ann-refresh");
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner dark"></span> 기관 사이트에서 가져오는 중…'; }
+  const before=new Set(ANNS.map(function(a){return a.key;}));
+  try{
+    const r=await fetch("/api/announcements?fresh=1");
+    const d=r.ok?await r.json():null;
+    if(!d||!d.items||!d.items.length) throw new Error("empty");
+    useAnnData(d); writeAnnCache(annSource,d.items,ANN_AT); ANN_FULL=true;
+    const added=ANNS.filter(function(a){return !before.has(a.key);}).length;
+    refreshViewsAfterData();
+    showToast("공고 "+ANNS.length+"건을 새로 가져왔습니다"+(added?" · 새 공고 "+added+"건":" · 새 공고 없음"));
+  }catch(e){
+    showToast("지금은 기관 사이트 응답이 없습니다. 잠시 후 다시 눌러 주세요.");
+  }
+  annRefreshing=false;
+  renderAnnStamp();
+}
+function renderAnnStamp(){
+  const btn=document.getElementById("ann-refresh");
+  if(!btn||annRefreshing) return;
+  btn.disabled=false;
+  btn.innerHTML='↻ 공고 새로 가져오기';
+  const t=document.getElementById("ann-at");
+  if(t){
+    if(!ANN_AT||annSource==="seed"){ t.textContent=""; return; }
+    const d=new Date(ANN_AT), mins=Math.round((Date.now()-ANN_AT)/60000);
+    t.textContent="마지막 수집 "+(mins<1?"방금":mins<60?mins+"분 전":(d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"));
   }
 }
 
@@ -1355,7 +1459,48 @@ async function doLogin(){
   btn.disabled=false;
   if(error){ msg("login-msg","err","로그인에 실패했습니다: "+error.message); return; }
   userId=data.user.id; userEmail=data.user.email;
-  await loadUserData(); bumpLogin(); await loadWorkspaces(); loadOrg(); enterApp();
+  startSession();
+}
+/* ══ 빠른 입장 ══
+   마지막 접속 때의 회사 정보를 이 브라우저에 보관해 두었다가 먼저 보여주고,
+   서버의 최신 정보는 뒤에서 받아 조용히 바꿔 끼운다. */
+function snapKey(){ return "gg_snap_"+userId; }
+function readSnap(){
+  try{ const s=JSON.parse(localStorage.getItem(snapKey())||"null"); if(s&&s.profile) return s; }catch(e){}
+  return null;
+}
+function writeSnap(){
+  if(!userId||!USER_READY) return;
+  const snap={profile:PROFILE,scraps:scraps,ws:WS?{id:WS.id,name:WS.name}:null,wslist:(WSLIST||[]).map(function(o){return {id:o.id,name:o.name};}),at:Date.now()};
+  try{ localStorage.setItem(snapKey(),JSON.stringify(snap)); }
+  catch(e){ // 보관 공간이 모자라면 부피 큰 기록을 빼고 다시 시도
+    try{ const p=JSON.parse(JSON.stringify(PROFILE)); if(p.extra){ delete p.extra.insights; delete p.extra.deepCache; } snap.profile=p; localStorage.setItem(snapKey(),JSON.stringify(snap)); }catch(e2){}
+  }
+}
+let SYNC_P=null;
+async function syncUser(){
+  bumpLogin();
+  await loadUserData();
+  await loadWorkspaces();
+  loadOrg();
+  USER_READY=true;
+  writeSnap();
+}
+async function startSession(){
+  USER_READY=false;
+  const snap=readSnap();
+  if(snap){
+    PROFILE=snap.profile; PROFILE.extra=PROFILE.extra||{};
+    scraps=snap.scraps||{};
+    if(snap.ws&&snap.wslist&&snap.wslist.length){ WSLIST=snap.wslist; WS=WSLIST.find(function(o){return o.id===snap.ws.id;})||null; renderWsBox(); }
+  }
+  enterApp(); bootDone();
+  SYNC_P=syncUser();
+  try{ await SYNC_P; }catch(e){ USER_READY=true; }
+  if(!PROFILE.company){ go("onboarding"); document.getElementById("app").classList.add("hidden"); return; }
+  document.getElementById("greet-name").innerHTML=esc(greet());
+  rescoreAll(); applyAiCache();
+  refreshViewsAfterData();
 }
 async function doSignup(){
   if(DEMO_AUTH){ msg("signup-msg","err","아직 데이터베이스가 연결되지 않았습니다. 설치가이드 2단계(Supabase 연결)를 완료하면 회원가입이 활성화됩니다."); return; }
@@ -1372,12 +1517,17 @@ async function doSignup(){
 async function doLogout(){ if(sb) await sb.auth.signOut(); userId=null;userEmail=null; location.reload(); }
 async function loadUserData(){
   if(!sb||!userId) return;
-  const {data:p} = await sb.from("profiles").select("*").eq("id",userId).maybeSingle();
+  const [pr,sr] = await Promise.all([ // 두 가지를 동시에 요청
+    sb.from("profiles").select("*").eq("id",userId).maybeSingle(),
+    sb.from("scraps").select("*").eq("user_id",userId)
+  ]);
+  const p=pr.data, s=sr.data;
   if(p){ PROFILE={company:p.company||"",industry:p.industry||"",founded:p.founded||"",region:p.region||"",staff:p.staff||"",revenue:p.revenue||"",descr:p.descr||"",keywords:Array.isArray(p.keywords)?p.keywords:[],extra:(p.extra&&typeof p.extra==="object")?p.extra:{}}; }
-  const {data:s} = await sb.from("scraps").select("*").eq("user_id",userId);
   scraps={}; (s||[]).forEach(r=>scraps[r.ann_key]={status:r.status||"검토 중",detail:(r.detail&&typeof r.detail==="object")?r.detail:{}});
 }
 async function saveProfileRemote(){
+  if(SYNC_P&&!USER_READY){ try{ await SYNC_P; }catch(e){} } // 서버 정보를 받기 전에 옛 보관본으로 덮어쓰지 않게
+  writeSnap();
   if(WS){ await wsSave(); if(sb&&userId){ try{ await sb.from("profiles").update({company:PROFILE.company,email:userEmail||"",org_id:WS.id}).eq("id",userId); }catch(e){} } return; }
   if(!sb||!userId) return;
   await sb.from("profiles").upsert({ id:userId, email:userEmail||"", company:PROFILE.company, industry:PROFILE.industry, founded:PROFILE.founded, region:PROFILE.region, staff:PROFILE.staff, revenue:PROFILE.revenue, descr:PROFILE.descr, keywords:PROFILE.keywords, extra:PROFILE.extra||{}, doc_summary:(PROFILE.extra&&PROFILE.extra.doc&&PROFILE.extra.doc.summary)||"", updated_at:new Date().toISOString() });
@@ -1399,7 +1549,8 @@ async function finishOnboarding(){
   const btn=document.getElementById("onb-done"); btn.disabled=true; btn.innerHTML='<span class="spinner"></span> 저장 중…';
   await saveProfileRemote();
   btn.disabled=false; btn.textContent="완료 — 브리핑 시작하기";
-  enterApp();
+  USER_READY=true; writeSnap();
+  enterApp(); maybeRunAi();
 }
 
 /* ══ 라우팅 ══ */
@@ -1435,8 +1586,6 @@ function enterApp(){
   document.getElementById("today-str").textContent = fmtDate(new Date());
   var adm=document.getElementById("nav-admin"); if(adm) adm.classList.toggle("hidden", userEmail!==ADMIN_EMAIL);
   go("dashboard");
-  if(userId) setTimeout(function(){ genInsight(false); }, 1200);
-  if(userId) setTimeout(aiRerank, 2600);
 }
 
 /* ══ 렌더: 대시보드 ══ */
@@ -1453,18 +1602,22 @@ function ddayHtml(a){
 let dashFilter="all";
 function matchedList(){
   const hi=ANNS.filter(function(a){return a.score>=72;});
-  if(hi.length) return hi;
-  const mid=ANNS.filter(function(a){return a.score>=58;});
-  return mid.slice(0,5);
+  if(hi.length>=8) return hi;
+  // 적합 공고가 적으면 '검토' 등급(58~71)으로 8건까지 채운다 — 도장 색으로 구분된다
+  const mid=ANNS.filter(function(a){return a.score>=58&&a.score<72;});
+  const out=hi.concat(mid.slice(0,8-hi.length));
+  return out.length?out:ANNS.filter(function(a){return a.score>=45;}).slice(0,5); // 아무것도 없으면 가장 가까운 5건이라도
 }
 function renderDash(){
   var _gw=document.getElementById("greet-ws");
   if(_gw) _gw.innerHTML = WS ? (' <span style="font-size:.62em;background:var(--navy-wash);color:var(--navy);padding:3px 12px;border-radius:99px;font-weight:700;vertical-align:middle;">'+esc(WS.name)+'</span>') : "";
   var _dw=document.getElementById("dash-ws");
   if(_dw) _dw.textContent = WS ? ("프로젝트: "+WS.name) : "";
-  if(annSource==="loading"&&!ANNS.length){
-    document.getElementById("brief-title").innerHTML='공고를 불러오는 중입니다…';
-    document.getElementById("dash-list").innerHTML='<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+  renderAnnStamp();
+  const waitingUser=userId&&!USER_READY&&!PROFILE.company; // 이 기기 첫 로그인: 회사 정보를 받는 중
+  if((annSource==="loading"&&!ANNS.length)||waitingUser){
+    document.getElementById("brief-title").innerHTML=waitingUser?'회사 정보를 불러오는 중입니다…':'공고를 불러오는 중입니다…';
+    document.getElementById("dash-cards").innerHTML='<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
     return;
   }
   rescoreAll(); applyAiCache();
@@ -1752,8 +1905,7 @@ async function saveProfile(showMsg){
   PROFILE.extra.staffmix=document.getElementById("p-staffmix").value.trim();
   PROFILE.extra.history=document.getElementById("p-history").value.trim();
   PROFILE.extra.invest=document.getElementById("p-invest").value.trim();
-  if(PROFILE.extra) delete PROFILE.extra.aiscore;
-  await saveProfileRemote(); rescoreAll(); setTimeout(aiRerank,600);
+  await saveProfileRemote(); rescoreAll(); setTimeout(aiRerank,600); // 바뀐 항목이 있으면 매칭 사전·AI 점수가 알아서 새로 만들어진다
   if(showMsg){ const m=document.getElementById("p-save-msg"); m.textContent = (sb&&userId)?"저장되었습니다 ✓":"저장됨 (체험 모드 — 새로고침 시 초기화)"; setTimeout(()=>m.textContent="",3000); }
 }
 
@@ -2650,13 +2802,16 @@ function renderInsightView(){
   const cur=arr.find(function(x){return x.date===insightSel;});
   body.innerHTML=mdRich(cur.text);
 }
+let insightRunning=false;
 async function genInsight(force){
+  if(insightRunning) return;
   const dash=document.getElementById("insight-body");
   const full=document.getElementById("insight-full");
   const today=new Date().toISOString().slice(0,10);
   const arr=getInsights();
   if(!force&&arr.length&&arr[0].date===today){ renderInsightDash(); if(currentView==="insight")renderInsightView(); return; }
   if(!ANNS.length) return;
+  insightRunning=true;
   if(dash) dash.innerHTML='<span class="spinner dark"></span> 오늘의 리포트 생성 중…';
   if(full&&currentView==="insight") full.innerHTML='<span class="spinner dark"></span> 오늘의 리포트를 작성하고 있습니다…';
   try{
@@ -2675,18 +2830,26 @@ async function genInsight(force){
     if(dash) dash.innerHTML=msg;
     if(full&&currentView==="insight") full.innerHTML=msg;
   }
+  insightRunning=false;
 }
 
 /* ══ AI 요건 검증 (하루 1회, 상위 후보 재채점) ══ */
 let aiRerankRunning=false;
-function applyAiCache(){
+/* AI 점수 보관: 공고별로 저장하고 프로필이 같으면 7일간 재사용 → 새로 들어온 공고만 AI가 본다 */
+function aiCacheMap(){
   const c=PROFILE.extra&&PROFILE.extra.aiscore;
-  if(!c||c.date!==new Date().toISOString().slice(0,10)||!c.map) return;
-  let touched=false;
-  ANNS.forEach(function(a){
-    const v=c.map[a.key];
-    if(v){ a.score=v.s; a.verdict=a.score>=75?"적합":(a.score>=58?"검토":"낮음"); a.note="AI 검증: "+v.n; touched=true; }
-  });
+  if(!c||c.sig!==profileSig()||!c.map) return null;
+  return c.map;
+}
+function applyAiCache(){
+  const map=aiCacheMap();
+  if(map){
+    const week=Date.now()-7*86400000;
+    ANNS.forEach(function(a){
+      const v=map[a.key];
+      if(v&&(v.t||0)>week){ a.score=v.s; a.verdict=a.score>=75?"적합":(a.score>=58?"검토":"낮음"); a.note="AI 검증: "+v.n; a.aiChecked=true; }
+    });
+  }
   applyDeepCache();
   ANNS.sort(function(x,y){return y.score-x.score;});
 }
@@ -2694,25 +2857,39 @@ function applyDeepCache(){
   const c=PROFILE.extra&&PROFILE.extra.deepCache; if(!c) return;
   ANNS.forEach(function(a){ const v=c[a.key]; if(v&&v.j) applyDeepScore(a,v.j); });
 }
+async function aiScoreBatch(cand){
+  const listTxt=cand.map(function(a,i){
+    return i+". ["+a.field+"] "+a.title+" · 주관 "+(a.agency||"-")+" · 마감 "+(a.dday===999?"상시":"D-"+a.dday)+(a.summary?" — "+a.summary.slice(0,160):"");
+  }).join("\n");
+  const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[후보 공고 "+cand.length+"건]\n"+listTxt+"\n\n너는 이 회사의 정부지원사업 담당 컨설턴트다. 각 공고를 '이 회사가 실제로 신청해서 선정될 수 있고, 선정되면 도움이 되는가' 기준으로 냉정하게 채점해라.\n\n채점 원칙(엄격히 적용):\n1. 자격 미달이면 30점 이하 — 업력 제한, 지역 제한, 예비창업자 대상, 업종 한정(소상공인/농업/제조/건설 등 우리 업종이 아닌 것)\n2. 우리 업종·제품과 무관한 분야의 공고는 40점 이하. 회사 사업 내용과의 실질적 연결이 없으면 높은 점수 금지\n3. 단순 교육·설명회·세미나·경진대회·참관은 55점 이하 (자금 지원이 아님)\n4. 소재지가 같다는 이유만으로 점수를 올리지 말 것. 지역은 자격 조건일 뿐 적합성 근거가 아니다\n5. 80점 이상은 '자격 충족 + 사업 내용 직접 연관 + 필요한 지원 유형 일치' 3개가 모두 맞을 때만\n6. 전 산업 대상 공고(예: 수출바우처, 혁신바우처)는 우리 회사가 자격을 갖추고 필요한 지원 유형이면 70점대까지 줄 수 있다\n7. 애매하면 낮게 준다. 잘못된 추천이 누락보다 나쁘다\n\nJSON만 출력: {\"scores\":[{\"i\":0,\"s\":85,\"n\":\"25자 이내 사유(적합/부적합 근거 구체적으로)\"}, ...]} — "+cand.length+"개 전 항목 포함."}],2400);
+  const pj=parseJson(raw), out={};
+  (pj.scores||[]).forEach(function(o){
+    const a=cand[o.i]; if(!a) return;
+    out[a.key]={s:Math.max(5,Math.min(98,Math.round(Number(o.s)||0))), n:String(o.n||"").slice(0,40), t:Date.now()};
+  });
+  return out;
+}
 async function aiRerank(){
-  if(aiRerankRunning||!userId||!ANNS.length||annSource==="seed") return;
-  const today=new Date().toISOString().slice(0,10);
-  const c=PROFILE.extra&&PROFILE.extra.aiscore;
-  if(c&&c.date===today){ applyAiCache(); return; }
-  if(!PROFILE.company) return;
+  if(aiRerankRunning||!userId||!ANNS.length||annSource==="seed"||!PROFILE.company) return;
   aiRerankRunning=true;
   try{
-    const cand=ANNS.slice(0,30);
-    const listTxt=cand.map(function(a,i){return i+". ["+a.field+"] "+a.title+(a.summary?" — "+a.summary.slice(0,80):"");}).join("\n");
-    const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[후보 공고 25건]\n"+listTxt+"\n\n너는 이 회사의 정부지원사업 담당 컨설턴트다. 각 공고를 '이 회사가 실제로 신청해서 선정될 수 있고, 선정되면 도움이 되는가' 기준으로 냉정하게 채점해라.\n\n채점 원칙(엄격히 적용):\n1. 자격 미달이면 30점 이하 — 업력 제한, 지역 제한, 예비창업자 대상, 업종 한정(소상공인/농업/제조/건설 등 우리 업종이 아닌 것)\n2. 우리 업종·제품과 무관한 분야의 공고는 40점 이하. 회사 사업 내용과의 실질적 연결이 없으면 높은 점수 금지\n3. 단순 교육·설명회·세미나·경진대회·참관은 55점 이하 (자금 지원이 아님)\n4. 소재지가 같다는 이유만으로 점수를 올리지 말 것. 지역은 자격 조건일 뿐 적합성 근거가 아니다\n5. 80점 이상은 '자격 충족 + 사업 내용 직접 연관 + 필요한 지원 유형 일치' 3개가 모두 맞을 때만\n6. 애매하면 낮게 준다. 잘못된 추천이 누락보다 나쁘다\n\nJSON만 출력: {\"scores\":[{\"i\":0,\"s\":85,\"n\":\"25자 이내 사유(적합/부적합 근거 구체적으로)\"}, ...]} — 30개 전 항목 포함."}],1900);
-    const pj=parseJson(raw);
-    const map={};
-    (pj.scores||[]).forEach(function(o){
-      const a=cand[o.i]; if(!a) return;
-      map[a.key]={s:Math.max(5,Math.min(98,Math.round(Number(o.s)||0))), n:String(o.n||"").slice(0,40)};
-    });
-    PROFILE.extra=PROFILE.extra||{}; PROFILE.extra.aiscore={date:today,map:map};
-    await saveProfileRemote();
+    try{ await ensureMatchDict(); }catch(e){}   // 매칭 사전이 없거나 프로필이 바뀌었으면 먼저 만든다
+    rescoreAll();
+    const sig=profileSig(), week=Date.now()-7*86400000;
+    const old=aiCacheMap()||{};
+    // 규칙 점수로 명백한 부적합(마감·지역·업력·업종 불일치)을 걸러낸 뒤 상위 60건만 AI에게
+    const pool=ANNS.filter(function(a){ return a.score>=40&&(a.dday===999||a.dday>=0); }).slice(0,60);
+    const todo=pool.filter(function(a){ const v=old[a.key]; return !(v&&(v.t||0)>week); });
+    if(todo.length){
+      const batches=[]; for(let i=0;i<todo.length;i+=30) batches.push(todo.slice(i,i+30));
+      const results=await Promise.all(batches.map(function(b){ return aiScoreBatch(b).catch(function(){ return {}; }); }));
+      const live=new Set(ANNS.map(function(a){return a.key;}));
+      const map={};
+      Object.keys(old).forEach(function(k){ if(live.has(k)&&(old[k].t||0)>week) map[k]=old[k]; }); // 지난 공고 기록은 정리
+      results.forEach(function(r){ Object.assign(map,r); });
+      PROFILE.extra=PROFILE.extra||{}; PROFILE.extra.aiscore={sig:sig,map:map};
+      await saveProfileRemote();
+    }
     applyAiCache();
     if(currentView==="dashboard")renderDash();
     if(currentView==="search")renderSearch();
@@ -3106,11 +3283,14 @@ async function loadWorkspaces(){
   try{
     if(em){ // 초대 자동 수락
       const {data:inv}=await sb.from("org_members").select("id,org_id,status").eq("email",em).neq("status","active");
-      if(inv&&inv.length){ for(const r of inv){ await sb.from("org_members").update({user_id:userId,status:"active"}).eq("id",r.id); } PENDING_JOIN=true; }
+      if(inv&&inv.length){ await Promise.all(inv.map(function(r){ return sb.from("org_members").update({user_id:userId,status:"active"}).eq("id",r.id); })); PENDING_JOIN=true; }
     }
-    const {data:ms}=await sb.from("org_members").select("org_id,role").eq("status","active").or("user_id.eq."+userId+(em?(",email.eq."+em):""));
+    const [mr,or]=await Promise.all([ // 소속 조직과 내가 만든 조직을 동시에
+      sb.from("org_members").select("org_id,role").eq("status","active").or("user_id.eq."+userId+(em?(",email.eq."+em):"")),
+      sb.from("orgs").select("*").eq("owner_id",userId)
+    ]);
+    const ms=mr.data, own=or.data;
     const ids=[...new Set((ms||[]).map(function(m){return m.org_id;}))];
-    const {data:own}=await sb.from("orgs").select("*").eq("owner_id",userId);
     (own||[]).forEach(function(o){ if(ids.indexOf(o.id)<0) ids.push(o.id); });
     if(!ids.length){ WSLIST=[]; WS=null; renderWsBox(); return; }
     const {data:os}=await sb.from("orgs").select("*").in("id",ids);
@@ -4202,10 +4382,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawers();});
     const {data} = await sb.auth.getSession();
     if(data&&data.session){
       userId=data.session.user.id; userEmail=data.session.user.email;
-      await loadUserData(); bumpLogin(); await loadWorkspaces(); loadOrg();
-      if(!PROFILE.company){ enterApp(); go("onboarding"); document.getElementById("app").classList.add("hidden"); }
-      else enterApp();
-      bootDone();
+      startSession();
       return;
     }
   }

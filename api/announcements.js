@@ -70,7 +70,7 @@ function pickDateByPattern(it, pattern) {
 /* ── 기업마당 지원사업정보 (bizinfo.go.kr/uss/rss/bizinfoApi.do) ── */
 async function fetchBizinfoGokr(key) {
   const url = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do?crtfcKey=" +
-    (key.indexOf("%") >= 0 ? key : encodeURIComponent(key)) + "&dataType=json&searchCnt=150";
+    (key.indexOf("%") >= 0 ? key : encodeURIComponent(key)) + "&dataType=json&searchCnt=400";
   const r = await fetch(url, { headers: { accept: "application/json" } });
   const raw = await r.text();
   let json;
@@ -179,7 +179,7 @@ async function fetchMsit(key) {
 async function fetchSmes(key) {
   const today = new Date();
   const token = key.indexOf("%") >= 0 ? key : encodeURIComponent(key);
-  const windows = [30, 7]; // 1차 30일, 실패 시 7일(가벼운 요청)로 재시도
+  const windows = [60, 30, 7]; // 1차 60일, 실패하면 30일 → 7일(가벼운 요청)로 재시도
   let json = null, lastNote = "";
   for (let attempt = 0; attempt < windows.length; attempt++) {
     const past = new Date(today.getTime() - windows[attempt] * 24 * 60 * 60 * 1000);
@@ -192,7 +192,7 @@ async function fetchSmes(key) {
       catch (e) { lastNote = "응답이 JSON이 아님 · HTTP " + r.status + " · " + raw.replace(/\s+/g, " ").slice(0, 150); }
     } catch (e) { lastNote = "호출 실패: " + String(e && e.message ? e.message : e).slice(0, 100); }
   }
-  if (!json) return { items: [], note: lastNote + " (30일→7일 2회 시도, 그쪽 서버 응답 없음)" };
+  if (!json) return { items: [], note: lastNote + " (60일→30일→7일 3회 시도, 그쪽 서버 응답 없음)" };
 
   const list = findArray(json);
   if (!list) return { items: [], note: "중소벤처24 서버 응답: " + JSON.stringify(json).replace(/\s+/g, " ").slice(0, 200) };
@@ -242,15 +242,22 @@ async function fetchSmes(key) {
 
 /* ── K-Startup (공공데이터포털 15125364) ── */
 async function fetchKstartup(key) {
-  const url = "https://apis.data.go.kr/B552735/kisedKstartupService01/getAnnouncementInformation01" +
-    "?serviceKey=" + (key.indexOf("%") >= 0 ? key : encodeURIComponent(key)) + "&page=1&perPage=100&returnType=json";
-  const r = await fetch(url, { headers: { accept: "application/json" } });
-  const raw = await r.text();
-  let json; try { json = JSON.parse(raw); } catch (e) { return []; }
-  let list = Array.isArray(json.data) ? json.data
-    : (json.response && json.response.body && Array.isArray(json.response.body.items)) ? json.response.body.items
-    : findArray(json);
-  if (!list) return [];
+  const base = "https://apis.data.go.kr/B552735/kisedKstartupService01/getAnnouncementInformation01" +
+    "?serviceKey=" + (key.indexOf("%") >= 0 ? key : encodeURIComponent(key)) + "&perPage=100&returnType=json&page=";
+  // 1~3페이지를 동시에 — 뒤 페이지가 실패해도 1페이지 결과는 그대로 쓴다
+  const pages = await Promise.allSettled([1, 2, 3].map(async (pg) => {
+    const r = await fetch(base + pg, { headers: { accept: "application/json" } });
+    const raw = await r.text();
+    let json; try { json = JSON.parse(raw); } catch (e) { return []; }
+    const l = Array.isArray(json.data) ? json.data
+      : (json.response && json.response.body && Array.isArray(json.response.body.items)) ? json.response.body.items
+      : findArray(json);
+    return l || [];
+  }));
+  const list = [].concat(...pages.map((p) => (p.status === "fulfilled" ? p.value : [])));
+  if (!list.length) return [];
+  const today = yyyymmdd(new Date());
+  const seen = new Set();
   return list.map((it) => {
     const title = it.biz_pbanc_nm || it.pbanc_nm || it.bizPbancNm || it.title || "";
     if (!title) return null;
@@ -258,6 +265,11 @@ async function fetchKstartup(key) {
     if (prog !== undefined && String(prog).toUpperCase() === "N") return null;
     const bgng = it.pbanc_rcpt_bgng_dt || it.pbancRcptBgngDt || "";
     const end = it.pbanc_rcpt_end_dt || it.pbancRcptEndDt || "";
+    const endNum = String(end).replace(/[^0-9]/g, "").slice(0, 8);
+    if (endNum.length === 8 && endNum < today) return null; // 마감 지난 공고 제외
+    const sn = String(it.pbanc_sn || it.pbancSn || it.id || title);
+    if (seen.has(sn)) return null;
+    seen.add(sn);
     const region = stripHtml(it.supt_regin || it.suptRegin || "");
     let t = stripHtml(title);
     if (region && region !== "전국" && !/^\[/.test(t)) t = "[" + region + "] " + t;
@@ -340,6 +352,7 @@ module.exports = async (req, res) => {
     smes24_count: sm2.length,
     bizinfo_count: bz2.length,
     msit_count: ms.length,
+    fetched_at: new Date().toISOString(),
     smes24_note: smRes.note || "",
     bizinfo_note: bzRes.note || "",
     msit_note: msRes.note || "",
