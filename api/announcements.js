@@ -225,7 +225,7 @@ async function fetchSmes(key) {
       field: stripHtml(pick(it, ["bizType", "sportType", "lclasNm", "pldirSportRealmLclasCodeNm", "bsnsSeNm", "cl", "category"])) || "중기부 지원사업",
       agency: stripHtml(pick(it, ["cntcInsttNm", "insttNm", "jrsdInsttNm", "excInsttNm", "sportInsttNm", "orgNm"])) || "중소벤처24",
       period: (sDt || eDt) ? (ymd(sDt) + " ~ " + ymd(eDt)) : stripHtml(pick(it, ["rcptPd", "reqstPd", "period"])),
-      registered: ymd(pick(it, ["pblancDt", "regDt", "frstRegistDt", "registDt", "creatDt"]) || sDt),
+      registered: ymd(pick(it, ["pblancDt", "regDt", "frstRegistDt", "registDt", "creatDt"]) || sDt || pick(it, ["updDt"]).slice(0, 10)), // 게시일이 없으면 수정일로 (마감일 없는 공고의 경과일 계산용)
       summary: (function () {
         const cont = stripHtml(pick(it, ["sportCnts", "policyCnts", "cn", "cntnts", "pblancCn", "bsnsSumryCn", "sumry", "content"]));
         const trgt = stripHtml(pick(it, ["sportTrget", "trget", "target", "aplyTrget"]));
@@ -238,9 +238,7 @@ async function fetchSmes(key) {
     };
   }).filter(Boolean);
 
-  const noDate = list.find((it) => !pickDateByPattern(it, /(end|fin|closs?).*(dt|de)$/i));
-  const sample = noDate ? Object.keys(noDate).map((k) => k + "=" + String(noDate[k] == null ? "" : noDate[k]).replace(/\s+/g, " ").slice(0, 30)).join(" | ").slice(0, 900) : "";
-  return { items: items, note: items.length ? "" : ("응답은 정상이나 매핑된 공고 0건 · 항목 필드: " + fields), fields: fields, sample: sample };
+  return { items: items, note: items.length ? "" : ("응답은 정상이나 매핑된 공고 0건 · 항목 필드: " + fields), fields: fields };
 }
 
 /* ── K-Startup (공공데이터포털 15125364) ── */
@@ -363,7 +361,6 @@ module.exports = async (req, res) => {
     msit_note: msRes.note || "",
     msit_fields: msRes.fields || "",
     smes24_fields: smRes.fields || "",
-    smes24_nodate_sample: smRes.sample || "",
     msit_path: msRes.path || "",
     items
   };
