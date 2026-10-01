@@ -1088,7 +1088,8 @@ function msg(id, type, text){document.getElementById(id).innerHTML = text ? '<di
 
 /* ══ 마감일 파싱 & D-day ══ */
 function parseDeadline(period){
-  const s = String(period||"");
+  let s = String(period||"");
+  if(s.indexOf("~")>=0) s = s.split("~").pop(); // "시작 ~ 끝"에서 끝만 본다 — "2026.08.03 ~ "처럼 끝이 비면 마감일 없음
   const re = /(\d{4})[.\-\/년\s]?(\d{1,2})[.\-\/월\s]?(\d{1,2})/g;
   let m, last=null;
   while((m=re.exec(s))!==null) last=m;
