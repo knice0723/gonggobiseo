@@ -138,7 +138,8 @@ async function fetchMsit(key) {
     if (rr.status === "fulfilled" && rr.value.blocks) blocks = blocks.concat(rr.value.blocks);
     else if (rr.status === "fulfilled" && rr.value.err) note = rr.value.err;
   }
-  const cutoff = yyyymmdd(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000));
+  // 과기부 API는 마감일을 주지 않는다(원문 첨부파일에만 있음) → 게시 45일이 지난 공고는 끝난 것으로 본다
+  const cutoff = yyyymmdd(new Date(Date.now() - 45 * 24 * 60 * 60 * 1000));
   let maxPress = "";
   const seenMs = new Set();
   const items = blocks.map((b) => {
@@ -163,7 +164,7 @@ async function fetchMsit(key) {
       key: k, title: title, field: "기술·R&D", attach: attach,
       agency: "과학기술정보통신부" + (dept ? " " + dept : ""),
       period: "", registered: ymd(press),
-      summary: (contact ? "담당: " + contact + " — " : "") + "접수기간·자격요건은 원문 공고를 확인하세요.",
+      summary: (contact ? "담당: " + contact + " — " : "") + "마감일은 원문 첨부파일(공고문)에서 확인하세요.",
       url: url, source: "과기부 R&D"
     };
   }).filter(Boolean).sort((a, b) => String(b.registered).localeCompare(String(a.registered))).slice(0, 60);
@@ -237,7 +238,9 @@ async function fetchSmes(key) {
     };
   }).filter(Boolean);
 
-  return { items: items, note: items.length ? "" : ("응답은 정상이나 매핑된 공고 0건 · 항목 필드: " + fields), fields: fields };
+  const noDate = list.find((it) => !pickDateByPattern(it, /(end|fin|closs?).*(dt|de)$/i));
+  const sample = noDate ? Object.keys(noDate).map((k) => k + "=" + String(noDate[k] == null ? "" : noDate[k]).replace(/\s+/g, " ").slice(0, 30)).join(" | ").slice(0, 900) : "";
+  return { items: items, note: items.length ? "" : ("응답은 정상이나 매핑된 공고 0건 · 항목 필드: " + fields), fields: fields, sample: sample };
 }
 
 /* ── K-Startup (공공데이터포털 15125364) ── */
@@ -332,7 +335,9 @@ module.exports = async (req, res) => {
     if (map.has(norm)) { map.get(norm).dual = true; continue; }
     map.set(norm, it);
   }
-  let items = [...map.values()];
+  // 신청할 수 없는 공고(선정 결과·합격자 발표·취소)는 목록에서 뺀다
+  const NOT_APPLY = /선정\s*결과|결과\s*(공고|발표|안내)|합격자|최종\s*선정\s*(기업|명단)|심사\s*결과|선정\s*기업\s*발표|공고\s*취소|사업\s*취소/;
+  let items = [...map.values()].filter((it) => !NOT_APPLY.test(it.title));
   items.sort((a, b) => String(b.registered).localeCompare(String(a.registered)));
   if (items.length > 1500) items = items.slice(0, 1500);
 
@@ -357,6 +362,8 @@ module.exports = async (req, res) => {
     bizinfo_note: bzRes.note || "",
     msit_note: msRes.note || "",
     msit_fields: msRes.fields || "",
+    smes24_fields: smRes.fields || "",
+    smes24_nodate_sample: smRes.sample || "",
     msit_path: msRes.path || "",
     items
   };

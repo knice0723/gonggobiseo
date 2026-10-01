@@ -1271,6 +1271,9 @@ function scoreAnn(a){
   /* 6.2) 신청 공고가 아닌 것 — 선정 결과·합격자 발표·취소 공고 */
   if(/선정\s*결과|결과\s*(공고|발표|안내)|합격자|최종\s*선정\s*(기업|명단)|심사\s*결과|선정\s*기업\s*발표|공고\s*취소|사업\s*취소/.test(title)){ s-=45; warns.push("결과 발표·취소 공고 — 신청 대상 아님"); }
 
+  /* 6.3) 마감일이 없고 게시된 지 오래된 공고 — 이미 끝났을 가능성이 크다 */
+  if(a.noDeadline&&a.postedDays!==null&&a.postedDays>30){ s-=12; warns.push("게시 "+a.postedDays+"일 지남 — 마감 여부 원문 확인"); }
+
   /* 6.5) 구조적 제약 감지 — 컨소시엄·지정품목·과제 공고는 원문 확인 전 고득점 금지 */
   if(/컨소시엄|수요기업.{0,14}공급기업|공동\s*(신청|수행)|주관기관.{0,10}참여기관/.test(text)){ s-=10; warns.push("컨소시엄(공동 신청) 구성 필요"); }
   if(/지정\s*품목|품목요구서|지정\s*과제|품목\s*지정|RFP/i.test(text)){ s-=8; warns.push("지정 품목·과제 한정 — 요구서 확인 필수"); }
@@ -1305,6 +1308,12 @@ const SEED = [
   {key:"seed-7", source:"고용24(예시)", field:"인력", title:"2026년 청년일자리도약장려금 (상시 접수)", agency:"고용노동부", period:"상시", summary:"청년(15~34세) 정규직 채용 시 1인당 최대 720만 원 지원. 채용 전 참여 신청 필수.", url:"https://www.work24.go.kr", offsetEnd:null, isNew:false}
 ];
 
+function postedDaysAgo(reg){
+  const n=String(reg||"").replace(/[^0-9]/g,"");
+  if(n.length<8) return null;
+  const d=new Date(+n.slice(0,4),+n.slice(4,6)-1,+n.slice(6,8));
+  return Math.round((TODAY-d)/86400000);
+}
 function normalize(raw){
   const a = {
     key: raw.key, source: raw.source||"기업마당", field: raw.field||"기타",
@@ -1318,7 +1327,12 @@ function normalize(raw){
     const todayStr = new Date().toISOString().slice(0,10);
     if(a.registered && a.registered.slice(0,10)===todayStr) a.isNew = true;
   }
-  a.deadlineText = a.deadlineDate ? fmtDate(a.deadlineDate) : (a.period||"상시·원문 확인");
+  // 마감일이 없는 공고: 진짜 상시 접수인지, 기관이 마감일을 안 넘겨준 것인지 구분한다
+  a.noDeadline = !a.deadlineDate && !/상시|연중|수시|예산\s*소진|선착순/.test(a.period+" "+a.title+" "+a.summary);
+  a.postedDays = postedDaysAgo(a.registered);
+  a.deadlineText = a.deadlineDate ? fmtDate(a.deadlineDate)
+    : a.noDeadline ? "마감일 미표기"+(a.registered?" · 게시 "+a.registered:"")+" — 원문 확인"
+    : (a.period||"상시·원문 확인");
   return a;
 }
 function rescoreAll(){
@@ -1345,7 +1359,7 @@ function maybeRunAi(){
 function applyAnnItems(items){
   ANNS = items.map(normalize);
   rescoreAll();
-  ANNS = ANNS.filter(a=>ddayOf(a)===999 || ddayOf(a)>=-1);
+  ANNS = ANNS.filter(a=>(ddayOf(a)===999 || ddayOf(a)>=-1) && !(a.noDeadline&&a.postedDays>45)); // 마감일 없이 45일 넘은 공고는 끝난 것으로 본다
   const cats=[...new Set(ANNS.map(a=>a.field))].filter(Boolean);
   const sel=document.getElementById("f-cat");
   sel.innerHTML='<option value="">분야 전체</option>'+cats.map(c=>'<option>'+esc(c)+'</option>').join("");
@@ -1618,7 +1632,7 @@ function stampHtml(a,sm){
   return '<div class="stamp '+cls+'"><span class="score">'+a.score+'</span><span class="word">'+w+'</span></div>';
 }
 function ddayHtml(a){
-  if(a.dday===999) return '<span class="dday">상시</span>';
+  if(a.dday===999) return a.noDeadline?'<span class="dday" title="기관이 마감일을 제공하지 않음">마감 확인</span>':'<span class="dday">상시</span>';
   if(a.dday<0) return '<span class="dday">마감</span>';
   return '<span class="dday '+(a.dday<=7?"urgent":"")+'">D-'+a.dday+'</span>';
 }
@@ -1767,6 +1781,7 @@ function checklistFor(a){
   if(m) items.push({ok:!reg||m[1].includes(reg)||/전국/.test(m[1]), t:"지역 요건 ("+m[1]+")", why:reg?("내 소재지: "+PROFILE.region):"프로필에 소재지를 등록하세요"});
   else items.push({ok:true, t:"지역 제한 표기 없음", why:"원문에서 세부 지역 요건을 확인하세요"});
   if(a.dday!==999) items.push({ok:a.dday>=3, t:"접수 기간", why:a.dday<0?"이미 마감된 공고입니다":(a.dday<=2?"마감 임박 — 서류 준비 시간이 촉박합니다":"D-"+a.dday+", 준비 가능")});
+  else if(a.noDeadline) items.push({ok:false, t:"마감일 미표기", why:(a.registered?a.registered+" 게시 ("+a.postedDays+"일 전) — ":"")+"기관이 마감일을 제공하지 않았습니다. 원문·첨부파일에서 접수 기간을 꼭 확인하세요"});
   else items.push({ok:true, t:"상시 접수", why:"예산 소진 시 조기 마감될 수 있습니다"});
   items.push({ok:false, t:"세부 자격 (업력·매출·중복수혜)", why:"AI가 원문 없이 판단할 수 없는 항목 — 반드시 원문 공고에서 확인"});
   return items;
