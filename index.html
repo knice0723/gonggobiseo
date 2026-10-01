@@ -143,6 +143,8 @@ textarea{padding:13px 15px;line-height:1.7;}
 .plan-card.hot{border-color:var(--seal);box-shadow:0 4px 20px rgba(178,34,34,.09);}
 .plan-price{font-family:var(--serif);font-size:26px;font-weight:800;color:var(--ink);margin:6px 0 2px;}
 @media(max-width:900px){.wr-wrap{grid-template-columns:1fr;}.wr-toc{position:static;}}
+.btn-hide{background:none;border:none;color:var(--ink-faint);font-size:12.5px;cursor:pointer;padding:6px 8px;border-radius:6px;}
+.btn-hide:hover{color:var(--ink);background:var(--paper);}
 .just-viewed{outline:2px solid var(--navy);outline-offset:3px;border-radius:var(--radius);}
 .skel{height:120px;border-radius:var(--radius);background:linear-gradient(90deg,var(--card) 25%,var(--paper) 50%,var(--card) 75%);background-size:400% 100%;animation:skel 1.3s infinite;border:1px solid var(--line);margin-bottom:14px;}
 @keyframes skel{0%{background-position:100% 0}100%{background-position:0 0}}
@@ -527,6 +529,8 @@ textarea{padding:13px 15px;line-height:1.7;}
       </div>
       <p class="result-count" id="result-count"></p>
       <div id="search-list"></div>
+      <div style="margin-top:14px;"><button id="hidden-link" onclick="toggleHiddenList()" style="background:none;border:none;color:var(--ink-faint);font-size:12.5px;text-decoration:underline;cursor:pointer;"></button></div>
+      <div id="hidden-list" class="hidden" style="margin-top:8px;"></div>
     </div>
 
     <div id="view-detail" class="view"></div>
@@ -1596,6 +1600,41 @@ function go(v, fromPop){
   if(!fromPop) pushNav({v:v});
   restoreListPosition(v);
 }
+/* ══ 공고 숨기기 — 다시 띄우지 않을 공고 (회사 데이터에 저장되어 팀·기기 간 공유) ══ */
+function hiddenMap(){ return (PROFILE.extra&&PROFILE.extra.hidden)||{}; }
+function isHidden(a){ return !!hiddenMap()[a.key]; }
+function visibleAnns(){ const h=hiddenMap(); return ANNS.filter(function(a){return !h[a.key];}); }
+function rerenderLists(){
+  if(currentView==="dashboard")renderDash();
+  if(currentView==="search")renderSearch();
+  if(currentView==="calendar")renderCal();
+}
+async function hideAnn(idx){
+  const a=ANNS[idx]; if(!a) return;
+  PROFILE.extra=PROFILE.extra||{};
+  PROFILE.extra.hidden=Object.assign({},hiddenMap());
+  PROFILE.extra.hidden[a.key]={t:Date.now(),title:a.title.slice(0,80)};
+  if(currentView==="detail") backToList(); else rerenderLists();
+  showToast("이 공고를 숨겼습니다",{label:"되돌리기",fn:function(){ unhideAnn(a.key); }});
+  await saveProfileRemote();
+}
+async function unhideAnn(key){
+  PROFILE.extra=PROFILE.extra||{};
+  const h=Object.assign({},hiddenMap()); delete h[key]; PROFILE.extra.hidden=h;
+  rerenderLists();
+  await saveProfileRemote();
+}
+function toggleHiddenList(){
+  const box=document.getElementById("hidden-list"); if(!box) return;
+  if(!box.classList.contains("hidden")){ box.classList.add("hidden"); return; }
+  const h=hiddenMap(), keys=Object.keys(h).sort(function(x,y){return (h[y].t||0)-(h[x].t||0);});
+  box.innerHTML=keys.length?keys.map(function(k){
+    return '<div class="ann-row" style="opacity:.75;"><div class="info"><span class="t" style="font-weight:600;">'+esc(h[k].title||k)+'</span></div>'+
+      '<button class="btn" data-key="'+esc(k)+'" onclick="unhideAnn(this.dataset.key);this.closest(\'.ann-row\').remove();">다시 보기</button></div>';
+  }).join(""):'<div class="empty">숨긴 공고가 없습니다.</div>';
+  box.classList.remove("hidden");
+}
+
 /* ══ 목록으로 돌아올 때 방금 본 공고를 화면 맨 위에 ══ */
 let LIST_RETURN=null;
 function backToList(){
@@ -1639,12 +1678,13 @@ function ddayHtml(a){
 }
 let dashFilter="all";
 function matchedList(){
-  const hi=ANNS.filter(function(a){return a.score>=72;});
+  const ANNS_V=visibleAnns(); // 숨긴 공고 제외
+  const hi=ANNS_V.filter(function(a){return a.score>=72;});
   if(hi.length>=8) return hi;
   // 적합 공고가 적으면 '검토' 등급(58~71)으로 8건까지 채운다 — 도장 색으로 구분된다
-  const mid=ANNS.filter(function(a){return a.score>=58&&a.score<72;});
+  const mid=ANNS_V.filter(function(a){return a.score>=58&&a.score<72;});
   const out=hi.concat(mid.slice(0,8-hi.length));
-  return out.length?out:ANNS.filter(function(a){return a.score>=45;}).slice(0,5); // 아무것도 없으면 가장 가까운 5건이라도
+  return out.length?out:ANNS_V.filter(function(a){return a.score>=45;}).slice(0,5); // 아무것도 없으면 가장 가까운 5건이라도
 }
 function renderDash(){
   var _gw=document.getElementById("greet-ws");
@@ -1701,8 +1741,9 @@ function cardHtml(a){
     '<button class="btn btn-primary" onclick="openGuide('+idx+')">✍ 작성 가이드</button>'+
     '<button class="btn" onclick="openDetail('+idx+')">상세 보기</button>'+
     '<a class="btn" href="'+esc(a.url)+'" target="_blank" rel="noopener">원문 ↗</a>'+
-    '<span class="deadline-info">마감 '+esc(a.deadlineText)+'</span>'+
+    '<span class="deadline-info">'+(a.noDeadline?"":"마감 ")+esc(a.deadlineText)+'</span>'+
     '<button class="btn-scrap '+(scrapped?"on":"")+'" onclick="toggleScrap('+idx+')">'+(scrapped?"★ 스크랩됨":"☆ 스크랩")+'</button>'+
+    '<button class="btn-hide" onclick="hideAnn('+idx+')" title="이 공고를 목록에서 숨깁니다">✕ 숨기기</button>'+
     '</div></article>';
 }
 document.getElementById("dash-tabs").addEventListener("click",e=>{
@@ -1756,12 +1797,14 @@ function renderSearch(){
   const cat=document.getElementById("f-cat").value;
   const srcF=document.getElementById("f-src")?document.getElementById("f-src").value:"";
   const sort=document.getElementById("f-sort").value;
-  let list=ANNS.filter(a=>(!q||(a.title+" "+a.summary+" "+a.field).toLowerCase().includes(q))&&(!cat||a.field===cat)&&(!srcF||a.source===srcF));
+  let list=visibleAnns().filter(a=>(!q||(a.title+" "+a.summary+" "+a.field).toLowerCase().includes(q))&&(!cat||a.field===cat)&&(!srcF||a.source===srcF));
   if(sort==="dday") list=[...list].sort((x,y)=>(x.dday<0?9999:x.dday)-(y.dday<0?9999:y.dday));
   else if(sort==="new") list=[...list].sort((x,y)=>String(y.registered).localeCompare(String(x.registered)));
   else list=[...list].sort((x,y)=>y.score-x.score);
   const CAP=200;
   const total=list.length;
+  const hidN=Object.keys(hiddenMap()).length;
+  const hl=document.getElementById("hidden-link"); if(hl){ hl.textContent=hidN?"숨긴 공고 "+hidN+"건 관리":""; }
   document.getElementById("result-count").textContent="진행 중 공고 "+total+"건"+(total>CAP?" · 상위 "+CAP+"건 표시 — 검색어나 필터로 좁혀보세요":"")+" · 적합도는 내 프로필 기준";
   list=list.slice(0,CAP);
   document.getElementById("search-list").innerHTML = list.length ? list.map(a=>{
@@ -1770,7 +1813,8 @@ function renderSearch(){
       '<div class="info"><button class="t" onclick="openDetail('+i+')">'+esc(a.title)+'</button>'+
       '<div class="m"><span class="src">'+esc(a.source)+'</span><span>·</span><span>'+esc(a.field)+'</span><span>·</span>'+ddayHtml(a)+(a.dual?'<span class="badge-dual">2곳 게재</span>':"")+'</div></div>'+
       '<button class="btn-scrap '+(scrapped?"on":"")+'" style="margin-left:0;" onclick="toggleScrap('+i+')">'+(scrapped?"★":"☆")+'</button>'+
-      '<button class="btn" onclick="openDetail('+i+')">상세</button></div>';
+      '<button class="btn" onclick="openDetail('+i+')">상세</button>'+
+      '<button class="btn-hide" onclick="hideAnn('+i+')" title="이 공고를 목록에서 숨깁니다">✕</button></div>';
   }).join("") : '<div class="empty">검색 결과가 없습니다. 검색어나 필터를 바꿔보세요.</div>';
 }
 
@@ -1820,7 +1864,8 @@ function openDetail(idx, fromPop){
     '<button class="btn btn-seal btn-lg" onclick="startApply('+idx+')" style="margin-bottom:8px;">🚀 지원 시작 — 스크랩·지원 관리</button>'+
     '<button class="btn btn-lg" onclick="openGuide('+idx+')" style="margin-bottom:8px;">✍ 작성 가이드 열기</button>'+
     '<button class="btn btn-lg" onclick="openChat('+idx+')" style="margin-bottom:8px;">이 공고에 대해 AI 비서에게 질문</button>'+
-    '<button class="btn btn-lg" onclick="toggleScrap('+idx+')">'+(scrapped?"★ 스크랩 해제":"☆ 스크랩하고 캘린더에 담기")+'</button></div>'+
+    '<button class="btn btn-lg" onclick="toggleScrap('+idx+')">'+(scrapped?"★ 스크랩 해제":"☆ 스크랩하고 캘린더에 담기")+'</button>'+
+    '<button class="btn btn-lg" style="margin-top:8px;color:var(--ink-faint);" onclick="hideAnn('+idx+')">✕ 이 공고 다시 띄우지 않기</button></div>'+
     '<div class="panel"><h3>비슷한 공고</h3>'+
     (similar.length?similar.map(x=>'<div style="padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:13px;"><button style="background:none;border:none;padding:0;font-weight:600;text-align:left;line-height:1.45;color:inherit;cursor:pointer;" onclick="openDetail('+ANNS.indexOf(x)+')">'+esc(x.title)+'</button><div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px;">적합도 '+x.score+' · '+(x.dday===999?"상시":"D-"+x.dday)+'</div></div>').join(""):'<p class="mini-note">같은 분야의 다른 공고가 없습니다.</p>')+
     '</div></div></div>';
@@ -1852,7 +1897,7 @@ function renderCal(){
   let html=["일","월","화","수","목","금","토"].map(d=>'<div class="wd">'+d+'</div>').join("");
   for(let i=0;i<first.getDay();i++) html+='<div class="cal-cell"></div>';
   for(let d=1;d<=days;d++){
-    const evs=ANNS.map((a,i)=>({a,i})).filter(({a})=>a.deadlineDate&&a.deadlineDate.getFullYear()===calY&&a.deadlineDate.getMonth()===calM&&a.deadlineDate.getDate()===d&&(calMode==="all"||scraps[a.key]!==undefined||matchedKeys.has(a.key)));
+    const evs=ANNS.map((a,i)=>({a,i})).filter(({a})=>!isHidden(a)&&a.deadlineDate&&a.deadlineDate.getFullYear()===calY&&a.deadlineDate.getMonth()===calM&&a.deadlineDate.getDate()===d&&(calMode==="all"||scraps[a.key]!==undefined||matchedKeys.has(a.key)));
     const isToday=calY===TODAY.getFullYear()&&calM===TODAY.getMonth()&&d===TODAY.getDate();
     const shown=evs.slice(0,3);
     html+='<div class="cal-cell '+(isToday?"today":"")+'"><span class="d">'+d+'</span>'+
@@ -2856,7 +2901,7 @@ async function genInsight(force){
   if(dash) dash.innerHTML='<span class="spinner dark"></span> 오늘의 리포트 생성 중…';
   if(full&&currentView==="insight") full.innerHTML='<span class="spinner dark"></span> 오늘의 리포트를 작성하고 있습니다…';
   try{
-    const list=ANNS.slice(0,20).map(function(a){return "- ["+a.field+"] "+a.title+" ("+(a.dday===999?"상시":"D-"+a.dday)+")";}).join("\n");
+    const list=visibleAnns().slice(0,20).map(function(a){return "- ["+a.field+"] "+a.title+" ("+(a.dday===999?"상시":"D-"+a.dday)+")";}).join("\n");
     const raw=await callClaude([{role:"user",content:profileContext()+"\n\n[오늘 수집된 최신 공고 상위 20건]\n"+list+"\n\n위 회사를 위한 '데일리 인사이트 리포트'를 상세하게 작성해라. 형식(마크다운 ## 헤더 사용):\n## 오늘의 지원사업 동향 — 4~5문장, 분야별 흐름과 눈에 띄는 변화\n## 주목할 공고 TOP 3 — 공고명을 명시하고 각각 왜 이 회사에 맞는지/주의할 자격요건은 무엇인지 2~3문장씩\n## 준비 체크포인트 — 이번 주 안에 챙겨야 할 서류·요건 2~3가지\n## 오늘의 추천 액션 — 구체적 행동 1~2가지\n섹션 안의 항목은 반드시 '- ' 불릿으로 구분. 한국어 900자 내외. 확실하지 않은 요건은 원문 확인을 권고."}],1600);
     PROFILE.extra=PROFILE.extra||{};
     let ins=getInsights().filter(function(x){return x.date!==today;});
@@ -2919,7 +2964,7 @@ async function aiRerank(){
     const sig=profileSig(), week=Date.now()-7*86400000;
     const old=aiCacheMap()||{};
     // 규칙 점수로 명백한 부적합(마감·지역·업력·업종 불일치)을 걸러낸 뒤 상위 60건만 AI에게
-    const pool=ANNS.filter(function(a){ return a.score>=40&&(a.dday===999||a.dday>=0); }).slice(0,60);
+    const pool=ANNS.filter(function(a){ return !isHidden(a)&&a.score>=40&&(a.dday===999||a.dday>=0); }).slice(0,60);
     const todo=pool.filter(function(a){ const v=old[a.key]; return !(v&&(v.t||0)>week); });
     if(todo.length){
       const batches=[]; for(let i=0;i<todo.length;i+=30) batches.push(todo.slice(i,i+30));
@@ -3031,7 +3076,7 @@ function showDayAll(y,m,d){
   const matchedKeys=new Set(matchedList().map(function(x){return x.key;}));
   const evs=ANNS.map(function(a,i){return {a:a,i:i};}).filter(function(o){
     var a=o.a;
-    return a.deadlineDate&&a.deadlineDate.getFullYear()===y&&a.deadlineDate.getMonth()===m&&a.deadlineDate.getDate()===d&&(calMode==="all"||scraps[a.key]!==undefined||matchedKeys.has(a.key));
+    return !isHidden(a)&&a.deadlineDate&&a.deadlineDate.getFullYear()===y&&a.deadlineDate.getMonth()===m&&a.deadlineDate.getDate()===d&&(calMode==="all"||scraps[a.key]!==undefined||matchedKeys.has(a.key));
   }).sort(function(x1,x2){return x2.a.score-x1.a.score;});
   document.getElementById("guide-title").textContent=(m+1)+"월 "+d+"일 마감 공고 · "+evs.length+"건";
   document.getElementById("guide-body").innerHTML=evs.map(function(o){
@@ -3452,13 +3497,21 @@ function startWsPoll(){
     }catch(e){}
   },20000);
 }
-function showToast(msg){
+function showToast(msg,action){
   let t=document.getElementById("toast");
   if(!t){ t=document.createElement("div"); t.id="toast";
-    t.style.cssText="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 20px;border-radius:99px;font-size:13px;font-weight:600;z-index:300;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .3s;";
+    t.style.cssText="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 20px;border-radius:99px;font-size:13px;font-weight:600;z-index:300;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .3s;pointer-events:none;";
     document.body.appendChild(t); }
-  t.textContent=msg; t.style.opacity="1";
-  clearTimeout(t._h); t._h=setTimeout(function(){ t.style.opacity="0"; },4000);
+  t.textContent=msg;
+  if(action){ // 되돌리기 같은 버튼을 함께
+    const b=document.createElement("button");
+    b.textContent=action.label;
+    b.style.cssText="margin-left:14px;background:none;border:none;color:#fff;font-weight:800;text-decoration:underline;cursor:pointer;font-size:13px;";
+    b.onclick=function(){ t.style.opacity="0"; t.style.pointerEvents="none"; action.fn(); };
+    t.appendChild(b);
+  }
+  t.style.opacity="1"; t.style.pointerEvents="auto";
+  clearTimeout(t._h); t._h=setTimeout(function(){ t.style.opacity="0"; t.style.pointerEvents="none"; },action?6000:4000);
 }
 
 /* ════════ 팀 협업 ════════ */
